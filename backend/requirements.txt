@@ -1,0 +1,6 @@
+flask==3.0.3
+flask-cors==4.0.1
+paramiko==3.4.0
+pysnmp==4.4.12
+netmiko==4.3.0
+ipaddress

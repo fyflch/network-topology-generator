@@ -1,0 +1,78 @@
+[CONNECTED] 172.16.16.2:23
+������������
+User Access Verification
+
+Username:[SEND] "admin\r\n"
+admin
+Password:[SEND] "ruijie@123\r\n"
+
+
+
+2FRDJHLW1#[LOGGED IN!]
+[SEND] "show version\r\n"
+show version
+System description      : Ruijie 10G Routing Switch(S5750-48GT/4SFP-S) By Ruijie Networks
+System start time       : 2023-12-02 13:9:37
+System uptime           : 895:7:27:19
+System hardware version : 1.05
+System software version : RGOS 10.4(3b16)p2 Release(178747)
+System BOOT version     : 10.4(3b16)p2 Release(178747)
+System CTRL version     : 10.4(3b16)p2 Release(178747)
+System serial number    : G1J814300010B
+Device information:
+  Device-1:
+    Hardware version : 1.05
+    Software version : RGOS 10.4(3b16)p2 Release(178747)
+    BOOT version     : 10.4(3b16)p2 Release(178747)
+    CTRL version     : 10.4(3b16)p2 Release(178747)
+    Serial number    : G1J814300010B
+2FRDJHLW1#[SEND] "show lldp neighbor\r\n"
+show lldp neighbor
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+System Name                 Local Intf          Port ID                 Capability   Aging-time
+Unknown                     Gi0/21              6c4b.908f.4423                       44minutes 33seconds 
+2FRDJHLW2                   Gi0/47              Gi0/48                  P, B, R      1minutes 54seconds 
+JZFJ-NEW-HLWHX              Gi0/48              Gi1/25                  P, B, R      1minutes 34seconds 
+
+Total entries displayed: 3
+2FRDJHLW1#[TIMEOUT step 3]
+[ERR] read ECONNRESET
+
+[CLOSED at step 3]
+=== ALL DATA ===
+������������
+User Access Verification
+
+Username:admin
+Password:
+
+
+2FRDJHLW1#show version
+System description      : Ruijie 10G Routing Switch(S5750-48GT/4SFP-S) By Ruijie Networks
+System start time       : 2023-12-02 13:9:37
+System uptime           : 895:7:27:19
+System hardware version : 1.05
+System software version : RGOS 10.4(3b16)p2 Release(178747)
+System BOOT version     : 10.4(3b16)p2 Release(178747)
+System CTRL version     : 10.4(3b16)p2 Release(178747)
+System serial number    : G1J814300010B
+Device information:
+  Device-1:
+    Hardware version : 1.05
+    Software version : RGOS 10.4(3b16)p2 Release(178747)
+    BOOT version     : 10.4(3b16)p2 Release(178747)
+    CTRL version     : 10.4(3b16)p2 Release(178747)
+    Serial number    : G1J814300010B
+2FRDJHLW1#show lldp neighbor
+Capability codes:
+    (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+    (W) WLAN Access Point, (P) Repeater, (S) Station, (O) Other
+System Name                 Local Intf          Port ID                 Capability   Aging-time
+Unknown                     Gi0/21              6c4b.908f.4423                       44minutes 33seconds 
+2FRDJHLW2                   Gi0/47              Gi0/48                  P, B, R      1minutes 54seconds 
+JZFJ-NEW-HLWHX              Gi0/48              Gi1/25                  P, B, R      1minutes 34seconds 
+
+Total entries displayed: 3
+2FRDJHLW1#

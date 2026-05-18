@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>网络拓扑管理系统</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; font-size: 14px; overflow: hidden; display: flex; flex-direction: column; }
+
+/* 顶部导航 */
+.topbar { background: #161b22; border-bottom: 1px solid #30363d; display: flex; align-items: center; padding: 0 20px; height: 52px; flex-shrink: 0; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+.logo-icon { width: 32px; height: 32px; background: #1f6feb; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.nav-tabs { display: flex; gap: 4px; margin-left: 28px; }
+.nav-tab { padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #8b949e; border: none; background: transparent; }
+.nav-tab:hover { background: #21262d; color: #e6edf3; }
+.nav-tab.active { background: #1f6feb; color: #fff; }
+.topbar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 12px; color: #8b949e; }
+.status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3fb950; margin-right: 5px; }
+.status-dot.offline { background: #f85149; }
+
+/* 主体布局 */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* 左侧面板 */
+.sidebar { width: 310px; background: #161b22; border-right: 1px solid #30363d; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.sidebar-hd { padding: 12px 14px; border-bottom: 1px solid #30363d; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #8b949e; }
+.sidebar-bd { flex: 1; overflow-y: auto; padding: 12px; }
+.sidebar-bd::-webkit-scrollbar { width: 4px; }
+.sidebar-bd::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+
+/* 表单 */
+.fg { margin-bottom: 10px; }
+.fg label { display: block; font-size: 11px; color: #8b949e; margin-bottom: 4px; }
+.fg input { width: 100%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 7px 9px; border-radius: 6px; font-size: 13px; outline: none; }
+.fg input:focus { border-color: #388bfd; }
+.fg input::placeholder { color: #555; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* 按钮 */
+.btn { padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #1f6feb; color: #fff; width: 100%; justify-content: center; }
+.btn-primary:hover { background: #388bfd; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-demo { background: transparent; color: #bc8cff; border: 1px solid #bc8cff; width: 100%; justify-content: center; margin-top: 6px; }
+.btn-demo:hover { background: rgba(188,140,255,.12); }
+.btn-sm { padding: 4px 10px; background: #21262d; border: 1px solid #30363d; color: #8b949e; border-radius: 5px; font-size: 12px; cursor: pointer; }
+.btn-sm:hover { color: #e6edf3; border-color: #388bfd; }
+.btn-sm.on { background: #1f6feb; color: #fff; border-color: #1f6feb; }
+
+/* 进度 */
+.prog-wrap { margin: 8px 0; }
+.prog-bar { height: 4px; background: #21262d; border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; background: #1f6feb; border-radius: 2px; transition: width .3s; }
+.prog-txt { font-size: 11px; color: #8b949e; margin-top: 3px; }
+
+/* 日志 */
+.logbox { background: #010409; border: 1px solid #30363d; border-radius: 5px; padding: 8px; font-family: Consolas, monospace; font-size: 11px; height: 110px; overflow-y: auto; margin: 8px 0; }
+.logbox::-webkit-scrollbar { width: 3px; }
+.logbox::-webkit-scrollbar-thumb { background: #30363d; }
+.lg-info { color: #58a6ff; }
+.lg-ok   { color: #3fb950; }
+.lg-err  { color: #f85149; }
+.lg-warn { color: #d29922; }
+
+/* 设备小卡片 */
+.sec-hd { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #8b949e; margin: 12px 0 7px; display: flex; align-items: center; justify-content: space-between; }
+.cnt { background: #21262d; color: #8b949e; padding: 1px 7px; border-radius: 10px; font-size: 11px; }
+.dv-card { padding: 9px; border-radius: 7px; border: 1px solid #30363d; margin-bottom: 5px; cursor: pointer; display: flex; gap: 9px; align-items: flex-start; }
+.dv-card:hover { border-color: #388bfd; background: rgba(56,139,253,.05); }
+.dv-card.sel { border-color: #388bfd; background: rgba(56,139,253,.09); }
+.dv-ico { width: 30px; height: 30px; border-radius: 6px; background: #21262d; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0; }
+.dv-inf { flex: 1; min-width: 0; }
+.dv-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-sub  { font-size: 10px; color: #8b949e; margin-top: 2px; }
+.dv-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+.dot-on  { background: #3fb950; }
+.dot-warn{ background: #d29922; }
+.dot-off { background: #f85149; }
+
+/* 页面 */
+.page { display: none; flex: 1; overflow: hidden; }
+.page.active { display: flex; }
+
+/* 拓扑区 */
+.topo-wrap { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.toolbar { background: #161b22; border-bottom: 1px solid #30363d; padding: 7px 14px; display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
+.t-group { display: flex; gap: 4px; }
+.legend { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 11px; color: #8b949e; }
+.leg-line { display: inline-block; width: 18px; height: 2px; margin-right: 4px; vertical-align: middle; border-radius: 1px; }
+
+.canvas { flex: 1; position: relative; overflow: hidden; background: #0d1117; }
+#svg { width: 100%; height: 100%; cursor: grab; display: block; }
+#svg:active { cursor: grabbing; }
+
+/* 空状态 */
+.empty { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; color: #8b949e; }
+.empty-ico { font-size: 52px; margin-bottom: 12px; opacity: .4; }
+.empty-t  { font-size: 15px; margin-bottom: 6px; }
+.empty-s  { font-size: 12px; opacity: .65; line-height: 1.6; }
+
+/* 详情面板 */
+.detail { width: 290px; background: #161b22; border-left: 1px solid #30363d; display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width .2s; }
+.detail.hide { width: 0; }
+.det-hd { padding: 12px 14px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; }
+.det-hd h3 { font-size: 14px; font-weight: 600; }
+.det-close { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 20px; line-height: 1; }
+.det-bd { flex: 1; overflow-y: auto; padding: 13px; }
+.det-bd::-webkit-scrollbar { width: 4px; }
+.det-bd::-webkit-scrollbar-thumb { background: #30363d; }
+.det-sec { margin-bottom: 16px; }
+.det-sec-t { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: #8b949e; margin-bottom: 7px; padding-bottom: 5px; border-bottom: 1px solid #30363d; }
+.irow { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 5px; }
+.ik { color: #8b949e; }
+.iv { color: #e6edf3; font-weight: 500; text-align: right; max-width: 160px; word-break: break-all; }
+
+/* 标签 */
+.tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.tg-g { background: rgba(63,185,80,.15);  color: #3fb950; }
+.tg-r { background: rgba(248,81,73,.15);  color: #f85149; }
+.tg-b { background: rgba(56,139,253,.15); color: #388bfd; }
+.tg-y { background: rgba(210,153,34,.15); color: #d29922; }
+.tg-p { background: rgba(188,140,255,.15);color: #bc8cff; }
+
+/* 邻居表 */
+.nb-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.nb-tbl th { color: #8b949e; text-align: left; padding: 3px 0; border-bottom: 1px solid #30363d; font-weight: 500; }
+.nb-tbl td { padding: 4px 0; border-bottom: 1px solid rgba(48,54,61,.5); vertical-align: top; }
+.nb-tbl tr:last-child td { border-bottom: none; }
+.chip { display: inline-block; background: #21262d; border: 1px solid #30363d; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-family: Consolas,monospace; }
+
+/* 设备/链路列表页 */
+.lst-page { flex-direction: column; }
+.stats-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; padding: 14px; border-bottom: 1px solid #30363d; flex-shrink: 0; }
+.s-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px; }
+.s-val { font-size: 22px; font-weight: 700; }
+.s-lbl { font-size: 11px; color: #8b949e; margin-top: 2px; }
+.tbl-wrap { flex: 1; overflow-y: auto; padding: 14px; }
+.tbl-wrap::-webkit-scrollbar { width: 5px; }
+.tbl-wrap::-webkit-scrollbar-thumb { background: #30363d; }
+.dtbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dtbl th { text-align: left; padding: 7px 10px; border-bottom: 2px solid #30363d; color: #8b949e; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; }
+.dtbl td { padding: 9px 10px; border-bottom: 1px solid rgba(48,54,61,.4); }
+.dtbl tbody tr:hover td { background: rgba(56,139,253,.04); }
+
+/* Tooltip */
+.tooltip { position: absolute; background: #21262d; border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px; font-size: 12px; pointer-events: none; z-index: 99; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.5); display: none; }
+.tooltip h4 { font-size: 13px; margin-bottom: 5px; }
+.tooltip .ts { color: #8b949e; font-size: 11px; margin: 2px 0; }
+
+/* spinner */
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: rot .6s linear infinite; }
+@keyframes rot { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🌐</div>
+    <span>网络拓扑管理系统</span>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="gotoPage('topo',this)">🗺 拓扑视图</button>
+    <button class="nav-tab" onclick="gotoPage('devices',this)">📋 设备列表</button>
+    <button class="nav-tab" onclick="gotoPage('links',this)">🔗 链路管理</button>
+  </div>
+  <div class="topbar-right">
+    <span class="status-dot" id="sDot"></span>
+    <span id="sTxt">后端未连接</span>
+    <button class="btn-sm" onclick="checkApi()">检测后端</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ══ 左侧扫描面板 ══ -->
+  <div class="sidebar">
+    <div class="sidebar-hd">🔍 扫描配置</div>
+    <div class="sidebar-bd">
+      <div class="fg">
+        <label>IP 范围</label>
+        <input id="ipR" value="10.0.0.1-10.0.0.10" placeholder="192.168.1.1-192.168.1.50">
+      </div>
+      <div class="row2">
+        <div class="fg"><label>SSH 端口</label><input id="sPort" value="22" type="number"></div>
+        <div class="fg"><label>超时(秒)</label><input id="tOut" value="5" type="number"></div>
+      </div>
+      <div class="fg"><label>用户名 <small style="color:#888;font-weight:normal">（可选）</small></label><input id="uname" placeholder="admin"></div>
+      <div class="fg"><label>密码 <small style="color:#888;font-weight:normal">（可选）</small></label><input id="upass" type="password" placeholder="••••••••"></div>
+      <div class="fg"><label>SNMP Community</label><input id="snmpC" value="public"></div>
+
+      <div class="logbox" id="logbox"></div>
+
+      <div class="prog-wrap" id="progWrap" style="display:none">
+        <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        <div class="prog-txt" id="progTxt">扫描中...</div>
+      </div>
+
+      <button class="btn btn-primary" id="scanBtn" onclick="doScan()">
+        <span class="spin" id="scanSpin" style="display:none"></span>
+        <span id="scanTxt">🚀 开始扫描</span>
+      </button>
+      <button class="btn btn-demo" onclick="doDemo()">🎭 加载演示数据</button>
+
+      <div class="sec-hd">已发现设备 <span class="cnt" id="dvCnt">0</span></div>
+      <div id="dvList"></div>
+    </div>
+  </div>
+
+  <!-- ══ 拓扑视图页 ══ -->
+  <div class="page active" id="page-topo">
+    <div class="topo-wrap">
+      <div class="toolbar">
+        <div class="t-group">
+          <button class="btn-sm" onclick="zoom(1.2)">+ 放大</button>
+          <button class="btn-sm" onclick="zoom(0.83)">- 缩小</button>
+          <button class="btn-sm" onclick="resetView()">⊞ 重置</button>
+          <button class="btn-sm" onclick="fitView()">⛶ 适应</button>
+        </div>
+        <div class="t-group">
+          <button class="btn-sm on" id="lyAuto" onclick="setLayout('auto',this)">⊛ 自动</button>
+          <button class="btn-sm" id="lyHier" onclick="setLayout('hier',this)">↕ 层次</button>
+          <button class="btn-sm" id="lyCircle" onclick="setLayout('circle',this)">◎ 环形</button>
+        </div>
+        <div class="t-group">
+          <button class="btn-sm" id="lblBtn" onclick="toggleLabel()">🏷 标签</button>
+          <button class="btn-sm" onclick="exportSVG()">💾 导出</button>
+        </div>
+        <div class="legend">
+          <span><span class="leg-line" style="background:#3fb950;height:3px"></span>10G</span>
+          <span><span class="leg-line" style="background:#388bfd"></span>1G</span>
+          <span><span class="leg-line" style="background:#bc8cff;border-top:2px dashed #bc8cff;height:0"></span>LAG</span>
+        </div>
+      </div>
+      <div class="canvas" id="cvs">
+        <svg id="svg">
+          <defs>
+            <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <g id="root">
+            <g id="gLinks"></g>
+            <g id="gNodes"></g>
+            <g id="gLabels"></g>
+          </g>
+        </svg>
+        <div class="empty" id="emptyTip">
+          <div class="empty-ico">🌐</div>
+          <div class="empty-t">暂无拓扑数据</div>
+          <div class="empty-s">点击左下角「加载演示数据」<br>立即查看效果</div>
+        </div>
+        <div class="tooltip" id="tip"></div>
+      </div>
+    </div>
+
+    <!-- 右侧详情 -->
+    <div class="detail hide" id="detPanel">
+      <div class="det-hd">
+        <h3 id="detTitle">设备详情</h3>
+        <button class="det-close" onclick="closeDetail()">×</button>
+      </div>
+      <div class="det-bd" id="detBody"></div>
+    </div>
+  </div>
+
+  <!-- ══ 设备列表页 ══ -->
+  <div class="page lst-page" id="page-devices">
+    <div class="stats-row">
+      <div class="s-card"><div class="s-val" id="stTotal">0</div><div class="s-lbl">总设备数</div></div>
+      <div class="s-card"><div class="s-val" id="stOnline" style="color:#3fb950">0</div><div class="s-lbl">在线</div></div>
+      <div class="s-card"><div class="s-val" id="stLinks" style="color:#388bfd">0</div><div class="s-lbl">链路数</div></div>
+      <div class="s-card"><div class="s-val" id="stVendor" style="color:#bc8cff">0</div><div class="s-lbl">厂商种类</div></div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="dtbl">
+        <thead><tr><th>状态</th><th>主机名</th><th>IP</th><th>厂商</th><th>型号</th><th>邻居数</th><th>告警</th><th>操作</th></tr></thead>
+        <tbody id="dvTblBody"><tr><td colspan="8" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 链路管理页 ══ -->
+  <div class="page lst-page" id="page-links">
+    <div class="tbl-wrap">
+      <h3 style="margin-bottom:14px;font-size:15px">🔗 链路明细</h3>
+      <table class="dtbl">
+        <thead><tr><th>源设备</th><th>源端口</th><th>目标设备</th><th>目标端口</th><th>链路类型</th><th>速率</th></tr></thead>
+        <tbody id="lkTblBody"><tr><td colspan="6" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ═══ 全局错误捕获 ═══
+window.onerror = function(msg, src, line, col, err) {
+  console.error('[JS ERROR] Line ' + line + ': ' + msg + (err && err.stack ? '\n' + err.stack : ''));
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[UNHANDLED REJECTION]', e.reason);
+});
+
+// ═══ 状态 ═══
+var API = 'http://localhost:5000/api';
+var devices = [], topo = {nodes:[],links:[]};
+var selNode = null, showLbl = true, layout = 'auto';
+var apiOk = false;
+var scale = 1, tx = 0, ty = 0;
+var nodePos = {};
+var panSt = null, dragNd = null, dragOx = 0, dragOy = 0, dragSx = 0, dragSy = 0;
+
+var NW = 104, NH = 58;
+
+var LKCOLOR = {
+  '10G Ethernet':'#3fb950','1G Ethernet':'#388bfd',
+  'LAG 聚合链路':'#bc8cff','25G Ethernet':'#39d353',
+  '40G Ethernet':'#d29922','100G Ethernet':'#f78166'
+};
+var VCOLOR = {huawei:'#e0302a',cisco:'#0077c8',h3c:'#00c864',ruijie:'#ffa000',generic:'#888888'};
+
+// ═══ 日志 ═══
+function log(msg, tp) {
+  var b = document.getElementById('logbox');
+  var d = document.createElement('div');
+  d.className = 'lg-' + (tp||'info');
+  var t = new Date(); var ts = ('0'+t.getHours()).slice(-2)+':'+('0'+t.getMinutes()).slice(-2)+':'+('0'+t.getSeconds()).slice(-2);
+  d.textContent = '['+ts+'] '+msg;
+  b.appendChild(d);
+  b.scrollTop = 99999;
+  while(b.children.length > 80) b.removeChild(b.firstChild);
+}
+
+// ═══ 后端检测 ═══
+function checkApi() {
+  if (typeof fetch === 'undefined') { log('浏览器不支持 fetch','error'); setApi(false); return; }
+  var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+  var timer = controller ? setTimeout(function(){ controller.abort(); }, 3000) : null;
+  fetch(API+'/health', controller ? {signal: controller.signal} : {})
+    .then(function(r){
+      if(timer) clearTimeout(timer);
+      setApi(r.ok);
+      if(r.ok) {
+        log('后端 API 连接正常 (:5000)','ok');
+      } else {
+        log('后端返回异常状态码: '+r.status,'warn');
+        setApi(false);
+      }
+    })
+    .catch(function(e){
+      if(timer) clearTimeout(timer);
+      log('后端连接失败: '+(e&&e.message?e.message:e),'error');
+      setApi(false);
+    });
+}
+function setApi(ok) {
+  apiOk = ok;
+  var d = document.getElementById('sDot'), t = document.getElementById('sTxt');
+  d.className = 'status-dot' + (ok ? '' : ' offline');
+  t.textContent = ok ? '后端已连接' : '后端未连接';
+}
+
+// ═══ 扫描 ═══
+var _scanTimer = null;
+function doScan() {
+  if (!apiOk) { log('后端未连接，请先启动 backend/server.js','warn'); alert('后端未连接！\n请先运行 node backend/server.js'); return; }
+  var ip = document.getElementById('ipR').value.trim();
+  var un = document.getElementById('uname').value.trim();
+  if (!ip) { alert('请填写 IP 范围'); return; }
+  setScan(true);
+  log('开始扫描: '+ip,'info');
+  setProgress(10,'提交扫描任务...');
+  fetch(API+'/scan',{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      ip_range: ip,
+      ssh_port: parseInt(document.getElementById('sPort').value)||22,
+      username: un,
+      password: document.getElementById('upass').value,
+      concurrency: 10,
+      snmp_community: document.getElementById('snmpC').value||'public'
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if(d.error){ log('扫描失败: '+d.error,'err'); alert(d.error); setScan(false); return; }
+    log('扫描任务已启动，共 '+d.total+' 个 IP','info');
+    _pollScan();
+  }).catch(function(e){ log('请求失败: '+e.message,'err'); setScan(false); });
+}
+
+function _pollScan() {
+  if(_scanTimer) clearTimeout(_scanTimer);
+  fetch(API+'/scan/status').then(function(r){ return r.json(); }).then(function(s){
+    setProgress(s.progress||0, s.message||'扫描中...');
+    if(s.running){
+      _scanTimer = setTimeout(_pollScan, 1200);
+    } else {
+      // 扫描结束，拉取拓扑数据
+      fetch(API+'/topology').then(function(r){ return r.json(); }).then(function(topo){
+        log(s.message||'扫描完成','ok');
+        loadTopoData(topo);
+        setProgress(100,'完成');
+      }).catch(function(e){ log('获取拓扑失败: '+e.message,'err'); }).finally(function(){
+        setScan(false);
+        setTimeout(function(){ setProgress(0,''); },2000);
+      });
+    }
+  }).catch(function(e){
+    log('状态查询失败: '+e.message,'err');
+    setScan(false);
+  });
+}
+
+// ═══ 演示数据 ═══
+function doDemo() {
+  setScan(true);
+  setProgress(30,'加载演示数据...');
+  log('加载内置演示拓扑...','info');
+
+  if (apiOk) {
+    fetch(API+'/topology/demo').then(function(r){ return r.json(); }).then(function(d){
+      loadTopoData(d); setProgress(100,'完成');
+      log('演示数据加载成功，共 '+devices.length+' 台设备','ok');
+    }).catch(function(){ loadData(localDemo()); setProgress(100,'完成'); log('已加载内置演示数据','ok'); }).finally(function(){
+      setScan(false); setTimeout(function(){ setProgress(0,''); },1500);
+    });
+  } else {
+    setTimeout(function(){
+      loadData(localDemo());
+      setProgress(100,'完成');
+      log('演示数据加载成功，共 '+devices.length+' 台设备','ok');
+      setScan(false);
+      setTimeout(function(){ setProgress(0,''); },1500);
+    }, 400);
+  }
+}
+
+function localDemo() {
+  return {
+    total_scanned:7, reachable:7,
+    devices:[
+      {ip:'10.0.0.1',hostname:'Core-SW-01',vendor:'Huawei',model:'S5735-L24T4X',version:'VRP V200R022',device_type:'huawei',status:'online',role:'core',
+       neighbors:[
+         {local_port:'10GE0/0/1',neighbor_device:'Core-SW-02',neighbor_port:'10GE0/0/1',link_type:'10G Ethernet'},
+         {local_port:'GE0/0/1',neighbor_device:'Access-SW-01',neighbor_port:'GE0/0/24',link_type:'1G Ethernet'},
+         {local_port:'GE0/0/2',neighbor_device:'Access-SW-02',neighbor_port:'GE0/0/24',link_type:'1G Ethernet'},
+         {local_port:'GE0/0/3',neighbor_device:'Access-SW-03',neighbor_port:'GE1/0/24',link_type:'1G Ethernet'}
+       ]},
+      {ip:'10.0.0.2',hostname:'Core-SW-02',vendor:'Huawei',model:'S5735-L24T4X',version:'VRP V200R022',device_type:'huawei',status:'online',role:'core',
+       neighbors:[
+         {local_port:'10GE0/0/1',neighbor_device:'Core-SW-01',neighbor_port:'10GE0/0/1',link_type:'10G Ethernet'},
+         {local_port:'GE0/0/1',neighbor_device:'Access-SW-04',neighbor_port:'GE0/24',link_type:'1G Ethernet'},
+         {local_port:'GE0/0/2',neighbor_device:'Access-SW-05',neighbor_port:'GE0/0/24',link_type:'1G Ethernet'}
+       ]},
+      {ip:'10.0.1.1',hostname:'Access-SW-01',vendor:'Cisco',model:'Catalyst 2960X-24TS',version:'IOS 15.2(7)E6',device_type:'cisco',status:'online',role:'access',
+       neighbors:[{local_port:'GE0/24',neighbor_device:'Core-SW-01',neighbor_port:'GE0/0/1',link_type:'1G Ethernet'}]},
+      {ip:'10.0.1.2',hostname:'Access-SW-02',vendor:'Cisco',model:'Catalyst 2960X-24TS',version:'IOS 15.2(7)E6',device_type:'cisco',status:'online',role:'access',
+       neighbors:[{local_port:'GE0/24',neighbor_device:'Core-SW-01',neighbor_port:'GE0/0/2',link_type:'1G Ethernet'}]},
+      {ip:'10.0.1.3',hostname:'Access-SW-03',vendor:'H3C',model:'S5500V3-28P-EI',version:'Comware 7.1.070',device_type:'h3c',status:'online',role:'access',
+       neighbors:[{local_port:'GE1/0/24',neighbor_device:'Core-SW-01',neighbor_port:'GE0/0/3',link_type:'1G Ethernet'}]},
+      {ip:'10.0.1.4',hostname:'Access-SW-04',vendor:'Ruijie',model:'RG-S2928G-E',version:'RGOS 11.4',device_type:'ruijie',status:'online',role:'access',
+       neighbors:[{local_port:'GE0/24',neighbor_device:'Core-SW-02',neighbor_port:'GE0/0/1',link_type:'1G Ethernet'}]},
+      {ip:'10.0.1.5',hostname:'Access-SW-05',vendor:'Huawei',model:'S2720-28TP-EI',version:'VRP V200R019',device_type:'huawei',status:'warning',role:'access',
+       neighbors:[{local_port:'GE0/0/24',neighbor_device:'Core-SW-02',neighbor_port:'GE0/0/2',link_type:'1G Ethernet'}]}
+    ]
+  };
+}
+
+// ═══ 数据加载（旧格式：d.devices 数组）═══
+function loadData(d) {
+  var dvs = d.devices || [];
+  devices = dvs;
+  topo = buildTopo(dvs);
+  nodePos = {};
+  _render();
+}
+
+// ═══ 数据加载（后端新格式：{ nodes, links, allDevices }）═══
+function loadTopoData(d) {
+  // 将 allDevices 转换为前端 devices 格式
+  var allDev = d.allDevices || d.nodes || [];
+  devices = allDev.map(function(x){
+    var v = x.vendor || 'unknown';
+    var vCap = v.charAt(0).toUpperCase() + v.slice(1);
+    return {
+      ip: x.ip,
+      hostname: x.label || x.hostname || x.ip,
+      vendor: vCap,
+      model: x.model || 'Unknown',
+      version: x.version || '',
+      device_type: v,
+      status: x.error ? 'warning' : 'online',
+      error: x.error || null,
+      sshWarn: x.sshWarn || null,
+      role: (x.neighborCount && x.neighborCount >= 3) ? 'core' : 'access',
+      neighbors: (x.neighbors || []).map(function(nb){
+        return {
+          local_port: nb.local_port,
+          neighbor_device: nb.remote_name || nb.remote_mgmt || '',
+          neighbor_port: nb.remote_port,
+          link_type: nb.link_type || guessLinkType(nb.local_port)
+        };
+      })
+    };
+  });
+
+  // 直接用后端已算好的 nodes/links 构建 topo
+  var backNodes = d.nodes || [];
+  var backLinks = d.links || [];
+  topo = {
+    nodes: backNodes.map(function(n){
+      var v = n.vendor || 'unknown';
+      return {
+        id: n.label || n.id,
+        ip: n.ip,
+        hostname: n.label || n.hostname || n.ip,
+        vendor: v.charAt(0).toUpperCase()+v.slice(1),
+        model: n.model || 'Unknown',
+        version: n.version || '',
+        device_type: v,
+        role: (n.neighborCount && n.neighborCount >= 3) ? 'core' : 'access',
+        status: n.error ? 'warning' : 'online'
+      };
+    }),
+    links: backLinks.map(function(l){
+      // source/target 转换为 hostname label
+      var sNode = backNodes.find(function(n){ return n.id === l.source || n.ip === l.source; });
+      var tNode = backNodes.find(function(n){ return n.id === l.target || n.ip === l.target; });
+      return {
+        source: sNode ? (sNode.label||sNode.id) : l.source,
+        target: tNode ? (tNode.label||tNode.id) : l.target,
+        source_port: l.source_port || '',
+        target_port: l.target_port || '',
+        link_type: l.link_type || '以太网',
+        speed: l.speed || '未知'
+      };
+    })
+  };
+  nodePos = {};
+  _render();
+}
+
+function _render() {
+  renderSidebar();
+  renderDevTable();
+  renderLinkTable();
+  updateStats();
+  renderTopo();
+  document.getElementById('emptyTip').style.display = 'none';
+}
+
+function buildTopo(dvs) {
+  var nodes = dvs.map(function(d){ return {id:d.hostname,ip:d.ip,hostname:d.hostname,vendor:d.vendor,model:d.model,version:d.version,device_type:d.device_type,role:d.role||'access',status:d.status}; });
+  var links = [], seen = {};
+  dvs.forEach(function(d){
+    (d.neighbors||[]).forEach(function(n){
+      var k = [d.hostname,n.neighbor_device].sort().join('||');
+      if(!seen[k]){
+        seen[k]=1;
+        var lt = n.link_type || guessLinkType(n.local_port);
+        links.push({source:d.hostname,target:n.neighbor_device,source_port:n.local_port,target_port:n.neighbor_port,link_type:lt,speed:guessSpeed(n.local_port)});
+      }
+    });
+  });
+  return {nodes:nodes,links:links};
+}
+function guessLinkType(p){ if(!p)return'1G Ethernet'; var l=p.toLowerCase(); if(l.indexOf('10ge')>=0||l.indexOf('te')>=0)return'10G Ethernet'; if(l.indexOf('lag')>=0||l.indexOf('po')>=0)return'LAG 聚合链路'; return'1G Ethernet'; }
+function guessSpeed(p){ if(!p)return'1Gbps'; var l=p.toLowerCase(); if(l.indexOf('100ge')>=0)return'100Gbps'; if(l.indexOf('tengig')>=0||l.indexOf('10ge')>=0)return'10Gbps'; if(l.indexOf('40g')>=0)return'40Gbps'; if(l.indexOf('25g')>=0)return'25Gbps'; return'1Gbps'; }
+
+// ═══ 统计 ═══
+function updateStats(){
+  var dvs = devices || [];
+  var cnt = dvs.length;
+  document.getElementById('dvCnt').textContent=cnt;
+  document.getElementById('stTotal').textContent=cnt;
+  document.getElementById('stOnline').textContent=dvs.filter(function(d){return d&&d.status==='online';}).length;
+  document.getElementById('stLinks').textContent=(topo&&topo.links)?topo.links.length:0;
+  var v={}; dvs.forEach(function(d){if(d&&d.vendor)v[d.vendor]=1;}); document.getElementById('stVendor').textContent=Object.keys(v).length;
+}
+
+// ═══ 侧边栏设备列表 ═══
+var VICO = {Huawei:'🔴',Cisco:'🔵',H3C:'🟢',Ruijie:'🟡'};
+function renderSidebar(){
+  var el=document.getElementById('dvList'); el.innerHTML='';
+  devices.forEach(function(d){
+    var div=document.createElement('div');
+    div.className='dv-card'+(selNode===d.hostname?' sel':'');
+    div.onclick=function(){ pickDev(d.hostname); };
+    var dotCls = d.status==='online'?'dot-on':d.status==='warning'?'dot-warn':'dot-off';
+    div.innerHTML='<div class="dv-ico">'+(VICO[d.vendor]||'🔘')+'</div>'
+      +'<div class="dv-inf"><div class="dv-name">'+d.hostname+'</div><div class="dv-sub">'+d.ip+' | '+(d.model||d.vendor||'-')+'</div></div>'
+      +'<div class="dv-dot '+dotCls+'"></div>';
+    el.appendChild(div);
+  });
+}
+
+// ═══ 设备表格 ═══
+function renderDevTable(){
+  var tb=document.getElementById('dvTblBody');
+  if(!devices.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr>'; return; }
+  tb.innerHTML=devices.map(function(d){
+    var stc = d.status==='online'?'tg-g':d.status==='warning'?'tg-y':'tg-r';
+    var stl = d.status==='online'?'在线':d.status==='warning'?'告警':'离线';
+    var warnInfo = d.error
+      ? '<span style="color:#f85149;font-size:11px">'+d.error.replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,40)+(d.error.length>40?'…':'')+'</span>'
+      : (d.sshWarn ? '<span style="color:#d29922;font-size:11px">'+d.sshWarn.replace(/</g,'&lt;').replace(/>/g,'&gt;').substring(0,40)+(d.sshWarn.length>40?'…':'')+'</span>' : '-');
+    return '<tr><td><span class="tag '+stc+'" style="cursor:pointer" onclick="pickDev(\''+d.hostname.replace(/'/g,'\\\'')+'\')" title="点击查看详情">'+stl+'</span></td>'
+      +'<td><strong>'+d.hostname+'</strong></td>'
+      +'<td style="font-family:Consolas;color:#388bfd">'+d.ip+'</td>'
+      +'<td>'+(d.vendor||'-')+'</td>'
+      +'<td>'+(d.model||'-')+'</td>'
+      +'<td>'+((d.neighbors||[]).length)+'</td>'
+      +'<td>'+warnInfo+'</td>'
+      +'<td><button class="btn-sm" onclick="pickDev(\''+d.hostname.replace(/'/g,'\\\'')+'\');gotoPage(\'topo\',null)\">定位</button></td></tr>';
+  }).join('');
+}
+
+// ═══ 链路表格 ═══
+function renderLinkTable(){
+  var tb=document.getElementById('lkTblBody');
+  if(!topo.links.length){ tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr>'; return; }
+  tb.innerHTML=topo.links.map(function(l){
+    var c=LKCOLOR[l.link_type]||'#388bfd';
+    return '<tr><td><strong>'+l.source+'</strong></td>'
+      +'<td><span class="chip">'+(l.source_port||'-')+'</span></td>'
+      +'<td><strong>'+l.target+'</strong></td>'
+      +'<td><span class="chip">'+(l.target_port||'-')+'</span></td>'
+      +'<td style="color:'+c+'">'+(l.link_type||'-')+'</td>'
+      +'<td><span class="tag tg-b">'+(l.speed||'-')+'</span></td></tr>';
+  }).join('');
+}
+
+// ═══ 布局计算 ═══
+function calcPos(nodes, ly) {
+  var pos = {}, W = document.getElementById('cvs').clientWidth||900, H = document.getElementById('cvs').clientHeight||600;
+  var cx = W/2, cy = H/2;
+  if(ly==='circle'){
+    var r = Math.min(W,H)*0.37;
+    nodes.forEach(function(n,i){ var a=(2*Math.PI*i/nodes.length)-Math.PI/2; pos[n.id]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)}; });
+    return pos;
+  }
+  if(ly==='hier'){
+    var cores=nodes.filter(function(n){return n.role==='core';}),
+        acc  =nodes.filter(function(n){return n.role!=='core';});
+    var layers=[cores,acc];
+    layers.forEach(function(layer,li){
+      if(!layer.length)return;
+      var y=100+li*220;
+      layer.forEach(function(n,i){ pos[n.id]={x:W/(layer.length+1)*(i+1),y:y}; });
+    });
+    return pos;
+  }
+  // auto
+  var cores=nodes.filter(function(n){return n.role==='core';}),
+      others=nodes.filter(function(n){return n.role!=='core';});
+  cores.forEach(function(n,i){
+    var a=(2*Math.PI*i/Math.max(cores.length,1))-Math.PI/2;
+    var r=cores.length>1?90:0;
+    pos[n.id]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};
+  });
+  others.forEach(function(n,i){
+    var a=(2*Math.PI*i/others.length)-Math.PI/2;
+    var r=Math.min(W,H)*0.33;
+    pos[n.id]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};
+  });
+  return pos;
+}
+
+// ═══ SVG 工具 ═══
+var NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs){
+  var el=document.createElementNS(NS,tag);
+  for(var k in attrs) el.setAttribute(k,attrs[k]);
+  return el;
+}
+function svgTxt(x,y,txt,fill,sz,bold){
+  var el=svgEl('text',{x:x,y:y,'text-anchor':'middle','font-size':sz||11,fill:fill||'#e6edf3','font-family':'Arial,sans-serif'});
+  if(bold) el.setAttribute('font-weight','bold');
+  el.textContent=txt;
+  return el;
+}
+
+// ═══ 拓扑渲染 ═══
+function renderTopo(){
+  var gL=document.getElementById('gLinks'),
+      gN=document.getElementById('gNodes'),
+      gLb=document.getElementById('gLabels');
+  gL.innerHTML=''; gN.innerHTML=''; gLb.innerHTML='';
+  if(!topo.nodes.length) return;
+
+  var calc = calcPos(topo.nodes, layout);
+  topo.nodes.forEach(function(n){ if(!nodePos[n.id]) nodePos[n.id]=calc[n.id]||{x:200,y:200}; });
+
+  // 链路
+  topo.links.forEach(function(lk){
+    var sp=nodePos[lk.source], tp=nodePos[lk.target];
+    if(!sp||!tp) return;
+    var c=LKCOLOR[lk.link_type]||'#388bfd';
+    var hi=lk.speed&&(lk.speed.includes('10G')||lk.speed.includes('25G')||lk.speed.includes('100G'));
+    var isLAG=lk.link_type&&lk.link_type.indexOf('LAG')>=0;
+
+    var line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:c,'stroke-width':hi?3:1.5,'stroke-opacity':'.85'});
+    if(isLAG) line.setAttribute('stroke-dasharray','7,4');
+    gL.appendChild(line);
+
+    // 热区
+    var hit=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:'transparent','stroke-width':12});
+    hit.style.cursor='pointer';
+    (function(l,c){ hit.addEventListener('mouseover',function(e){showTipLink(e,l,c);}); hit.addEventListener('mouseout',hideTip); })(lk,c);
+    gL.appendChild(hit);
+
+    if(showLbl){
+      var mx=(sp.x+tp.x)/2, my=(sp.y+tp.y)/2;
+      gLb.appendChild(svgTxt(sp.x*.82+tp.x*.18, sp.y*.82+tp.y*.18, lk.source_port||'', '#6e7681', 9));
+      gLb.appendChild(svgTxt(sp.x*.18+tp.x*.82, sp.y*.18+tp.y*.82, lk.target_port||'', '#6e7681', 9));
+      gLb.appendChild(svgTxt(mx, my-8, lk.speed||'', c, 10));
+    }
+  });
+
+  // 节点
+  topo.nodes.forEach(function(nd){
+    var pos=nodePos[nd.id]; if(!pos) return;
+    var g=svgEl('g',{});
+    g.setAttribute('transform','translate('+(pos.x-NW/2)+','+(pos.y-NH/2)+')');
+    g.style.cursor='pointer';
+
+    var isCore=nd.role==='core';
+    var isSel=selNode===nd.id;
+    var vc=VCOLOR[nd.device_type]||'#888';
+
+    if(isSel){
+      var gl=svgEl('rect',{x:-4,y:-4,width:NW+8,height:NH+8,rx:12,fill:'none',stroke:'#388bfd','stroke-width':2,filter:'url(#glow)'});
+      g.appendChild(gl);
+    }
+
+    var bg=svgEl('rect',{width:NW,height:NH,rx:8,fill:isCore?'#162032':'#21262d',stroke:isSel?'#388bfd':(isCore?'#1f6feb':vc),'stroke-width':isCore?2:1});
+    g.appendChild(bg);
+
+    var bar=svgEl('rect',{width:NW,height:5,rx:8,fill:vc});
+    g.appendChild(bar);
+
+    // 图标
+    var ico=svgEl('text',{x:14,y:30,'font-size':18});
+    ico.textContent=isCore?'🔷':'🔲';
+    g.appendChild(ico);
+
+    // 主机名
+    var nm=nd.hostname.length>12?nd.hostname.slice(0,11)+'…':nd.hostname;
+    g.appendChild(svgTxt(NW/2+8, 24, nm, '#e6edf3', 11, true));
+
+    // IP
+    g.appendChild(svgTxt(NW/2+8, 36, nd.ip||'', '#6e7681', 9));
+
+    // 型号
+    var ml=(nd.model||''); if(ml.length>15)ml=ml.slice(0,14)+'…';
+    g.appendChild(svgTxt(NW/2+8, 48, ml, vc, 8));
+
+    // 状态灯
+    var sc=nd.status==='online'?'#3fb950':nd.status==='warning'?'#d29922':'#f85149';
+    g.appendChild(svgEl('circle',{cx:NW-8,cy:9,r:4,fill:sc}));
+
+    // 事件
+    (function(node){
+      g.addEventListener('click',function(){ pickDev(node.id); });
+      g.addEventListener('mouseover',function(e){ showTipNode(e,node); });
+      g.addEventListener('mouseout',hideTip);
+      makeDrag(g, node.id);
+    })(nd);
+
+    gN.appendChild(g);
+  });
+}
+
+// ═══ 拖拽 ═══
+function makeDrag(g, id){
+  var dragging=false, ox=0, oy=0, sx=0, sy=0;
+  g.addEventListener('mousedown',function(e){
+    if(e.button!==0)return;
+    dragging=true; dragNd=id;
+    ox=nodePos[id].x; oy=nodePos[id].y;
+    sx=e.clientX; sy=e.clientY;
+    e.stopPropagation(); e.preventDefault();
+  });
+  document.addEventListener('mousemove',function(e){
+    if(!dragging||dragNd!==id)return;
+    nodePos[id]={x:ox+(e.clientX-sx)/scale, y:oy+(e.clientY-sy)/scale};
+    renderTopo();
+  });
+  document.addEventListener('mouseup',function(){
+    if(dragging&&dragNd===id){ dragging=false; dragNd=null; }
+  });
+}
+
+// ═══ 画布平移缩放 ═══
+var svgEl2=document.getElementById('svg');
+svgEl2.addEventListener('mousedown',function(e){
+  if(dragNd||e.target.closest('g[transform]'))return;
+  panSt={x:e.clientX-tx, y:e.clientY-ty};
+});
+svgEl2.addEventListener('mousemove',function(e){
+  if(!panSt||dragNd)return;
+  tx=e.clientX-panSt.x; ty=e.clientY-panSt.y;
+  applyTf();
+});
+svgEl2.addEventListener('mouseup',function(){ panSt=null; });
+svgEl2.addEventListener('mouseleave',function(){ panSt=null; });
+svgEl2.addEventListener('wheel',function(e){
+  e.preventDefault();
+  scale=Math.max(.2,Math.min(3, scale*(e.deltaY>0?.88:1.12)));
+  applyTf();
+},{passive:false});
+function applyTf(){ document.getElementById('root').setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')'); }
+function zoom(f){ scale=Math.max(.2,Math.min(3,scale*f)); applyTf(); }
+function resetView(){ scale=1; tx=0; ty=0; applyTf(); }
+function fitView(){ scale=.85; tx=0; ty=0; applyTf(); }
+
+// ═══ 布局切换 ═══
+function setLayout(ly, btn){
+  layout=ly; nodePos={};
+  ['lyAuto','lyHier','lyCircle'].forEach(function(id){ document.getElementById(id).className='btn-sm'; });
+  if(btn) btn.className='btn-sm on';
+  renderTopo();
+}
+function toggleLabel(){
+  showLbl=!showLbl;
+  document.getElementById('lblBtn').className='btn-sm'+(showLbl?' on':'');
+  renderTopo();
+}
+
+// ═══ 设备选择 / 详情面板 ═══
+function pickDev(id){
+  selNode=id;
+  renderSidebar(); renderTopo();
+  var d=devices.find(function(x){return x.hostname===id;});
+  if(!d)return;
+  var panel=document.getElementById('detPanel');
+  panel.className='detail';
+  document.getElementById('detTitle').textContent=d.hostname;
+
+  var stc=d.status==='online'?'tg-g':d.status==='warning'?'tg-y':'tg-r';
+  var stl=d.status==='online'?'在线':d.status==='warning'?'告警':'离线';
+  var vc=d.vendor==='Huawei'?'tg-r':d.vendor==='Cisco'?'tg-b':d.vendor==='H3C'?'tg-g':'tg-y';
+  var nb=d.neighbors||[];
+  var rows=nb.map(function(n){
+    var c=LKCOLOR[n.link_type]||'#388bfd';
+    return '<tr><td><span class="chip">'+(n.local_port||'-')+'</span></td>'
+      +'<td style="max-width:80px;word-break:break-word;font-size:11px">'+(n.neighbor_device||'-')+'</td>'
+      +'<td><span class="chip">'+(n.neighbor_port||'-')+'</span></td>'
+      +'<td style="color:'+c+';font-size:10px">'+(n.link_type||'-')+'</td></tr>';
+  }).join('');
+
+  document.getElementById('detBody').innerHTML=
+    '<div class="det-sec"><div class="det-sec-t">基本信息</div>'
+    +'<div class="irow"><span class="ik">状态</span><span class="iv"><span class="tag '+stc+'">'+stl+'</span></span></div>'
+    +'<div class="irow"><span class="ik">主机名</span><span class="iv">'+d.hostname+'</span></div>'
+    +'<div class="irow"><span class="ik">IP</span><span class="iv" style="color:#388bfd;font-family:Consolas">'+d.ip+'</span></div>'
+    +'<div class="irow"><span class="ik">厂商</span><span class="iv"><span class="tag '+vc+'">'+(d.vendor||'-')+'</span></span></div>'
+    +'<div class="irow"><span class="ik">型号</span><span class="iv">'+(d.model||'-')+'</span></div>'
+    +'<div class="irow"><span class="ik">版本</span><span class="iv" style="font-size:11px">'+(d.version||'-')+'</span></div>'
+    +'<div class="irow"><span class="ik">角色</span><span class="iv"><span class="tag tg-b">'+(d.role||'access')+'</span></span></div>'
+    +(d.error?'<div class="irow"><span class="ik">错误</span><span class="iv" style="color:#d29922;font-size:12px">'+d.error+'</span></div>':'')
+    +'</div>'
+    +'<div class="det-sec"><div class="det-sec-t">LLDP 邻居 ('+nb.length+')</div>'
+    +(nb.length?'<table class="nb-tbl"><thead><tr><th>本端口</th><th>对端设备</th><th>对端口</th><th>链路</th></tr></thead><tbody>'+rows+'</tbody></table>'
+      :'<div style="color:#8b949e;font-size:12px">无邻居信息</div>')
+    +'</div>'
+    +'<div class="det-sec"><div class="det-sec-t">SNMP OID</div>'
+    +'<div class="irow"><span class="ik">sysName</span><span class="iv" style="font-size:10px;font-family:Consolas">1.3.6.1.2.1.1.5.0</span></div>'
+    +'<div class="irow"><span class="ik">sysDescr</span><span class="iv" style="font-size:10px;font-family:Consolas">1.3.6.1.2.1.1.1.0</span></div>'
+    +'<div class="irow"><span class="ik">LLDP邻居</span><span class="iv" style="font-size:10px;font-family:Consolas">1.0.8802.1.1.2.*</span></div>'
+    +'</div>';
+}
+function closeDetail(){ selNode=null; document.getElementById('detPanel').className='detail hide'; renderSidebar(); renderTopo(); }
+
+// ═══ Tooltip ═══
+function showTipNode(e,nd){
+  var tt=document.getElementById('tip');
+  tt.innerHTML='<h4>'+nd.hostname+'</h4>'
+    +'<div class="ts">'+nd.ip+'</div>'
+    +'<div class="ts">厂商: <strong>'+(nd.vendor||'-')+'</strong></div>'
+    +'<div class="ts">型号: '+(nd.model||'-')+'</div>'
+    +'<div class="ts">版本: '+(nd.version||'-')+'</div>';
+  moveTip(e);
+}
+function showTipLink(e,lk,c){
+  var tt=document.getElementById('tip');
+  tt.innerHTML='<h4 style="color:'+c+'">🔗 '+(lk.link_type||'-')+'</h4>'
+    +'<div class="ts"><span class="chip">'+lk.source+'</span> : <span class="chip">'+(lk.source_port||'-')+'</span></div>'
+    +'<div class="ts" style="text-align:center">↕</div>'
+    +'<div class="ts"><span class="chip">'+lk.target+'</span> : <span class="chip">'+(lk.target_port||'-')+'</span></div>'
+    +'<div class="ts" style="margin-top:4px">速率: <strong style="color:#3fb950">'+(lk.speed||'-')+'</strong></div>';
+  moveTip(e);
+}
+function moveTip(e){
+  var tt=document.getElementById('tip'), cvs=document.getElementById('cvs'), r=cvs.getBoundingClientRect();
+  var x=e.clientX-r.left+14, y=e.clientY-r.top-10;
+  if(x+200>r.width) x-=210;
+  tt.style.left=x+'px'; tt.style.top=y+'px'; tt.style.display='block';
+}
+function hideTip(){ document.getElementById('tip').style.display='none'; }
+
+// ═══ 导出 ═══
+function exportSVG(){
+  var s=document.getElementById('svg');
+  var blob=new Blob([s.outerHTML],{type:'image/svg+xml'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download='topology.svg'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══ 页面切换 ═══
+function gotoPage(name, btn){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  else {
+    var map={topo:0,devices:1,links:2};
+    var tabs=document.querySelectorAll('.nav-tab');
+    if(tabs[map[name]]) tabs[map[name]].classList.add('active');
+  }
+}
+
+// ═══ 扫描UI ═══
+function setScan(on){
+  document.getElementById('scanBtn').disabled=on;
+  document.getElementById('scanSpin').style.display=on?'inline-block':'none';
+  document.getElementById('scanTxt').textContent=on?'扫描中...':'🚀 开始扫描';
+  document.getElementById('progWrap').style.display=on?'block':'none';
+}
+function setProgress(pct,txt){
+  document.getElementById('progFill').style.width=pct+'%';
+  if(txt) document.getElementById('progTxt').textContent=txt;
+}
+
+// ═══ 启动 ═══
+window.onload = function(){
+  console.log('[INIT] window.onload fired, checking DOM...');
+  console.log('[INIT] logbox exists:', !!document.getElementById('logbox'));
+  console.log('[INIT] scanBtn exists:', !!document.getElementById('scanBtn'));
+  console.log('[INIT] lblBtn exists:', !!document.getElementById('lblBtn'));
+  log('系统已就绪，欢迎使用网络拓扑管理系统','ok');
+  log('点击「加载演示数据」立即体验','info');
+  checkApi();
+  var lblBtn = document.getElementById('lblBtn');
+  if(lblBtn) lblBtn.className='btn-sm on';
+  console.log('[INIT] window.onload complete');
+};
+setInterval(checkApi, 30000);
+</script>
+</body>
+</html>

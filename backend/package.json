@@ -1,0 +1,17 @@
+{
+  "name": "network-topology-backend",
+  "version": "1.0.0",
+  "description": "网络拓扑管理系统后端（Node.js）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ssh2": "^1.16.0",
+    "net-snmp": "^3.13.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "ip-range-check": "^0.2.0",
+    "netmask": "^2.0.2"
+  }
+}
