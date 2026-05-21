@@ -357,7 +357,54 @@ var scale = 1, tx = 0, ty = 0;
 var nodePos = {};
 var panSt = null, dragNd = null, dragOx = 0, dragOy = 0, dragSx = 0, dragSy = 0;
 
-var NW = 104, NH = 58;
+var NW = 104, NH = 58; // 默认值（接入层），核心层动态放大
+
+// 设备类型图标 SVG path（24×24 viewBox）
+var DEVICE_ICONS = {
+  switch_core: '<path d="M2 8h20v8H2z M2 10h20v4H2z M2 12h20v2H2z" fill="currentColor"/>'
+    + '<path d="M6 4v4M10 4v4M14 4v4M18 4v4" stroke="currentColor" stroke-width="1.5" fill="none"/>'
+    + '<path d="M6 20v-4M10 20v-4M14 20v-4M18 20v-4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
+  switch: '<rect x="3" y="7" width="18" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M7 4v3M12 4v3M17 4v3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
+    + '<path d="M7 17v3M12 17v3M17 17v3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
+    + '<circle cx="7" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="17" cy="12" r="1.2" fill="currentColor"/>',
+  router: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M7 12h4M13 12h4M11 9v6M13 9v6" stroke="currentColor" stroke-width="1.5"/>',
+  firewall: '<path d="M12 2L4 7v10l8 5 8-5V7z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M9 10h6v4H9z" fill="currentColor" opacity="0.5"/>',
+  wireless: '<circle cx="12" cy="16" r="2" fill="currentColor"/>'
+    + '<path d="M6 12a8 8 0 0 1 12 0" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M9 8a6 6 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+  camera: '<rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M17 9l4-2v10l-4-2z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<circle cx="10" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  generic: '<rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
+    + '<path d="M8 9h8M8 12h8M8 15h5" stroke="currentColor" stroke-width="1.2"/>'
+};
+
+// 根据设备角色和类型选择图标
+function getDeviceIcon(nd) {
+  var t = (nd.device_type || '').toLowerCase();
+  var r = nd.role || 'access';
+  // 监控设备
+  if (t === 'hikvision' || t === 'dahua') return DEVICE_ICONS.camera;
+  // 无线设备（从型号/厂商推断）
+  if (t === 'tplink' && /eap|ap/i.test(nd.model||'')) return DEVICE_ICONS.wireless;
+  // 核心交换机
+  if (r === 'core') return DEVICE_ICONS.switch_core;
+  // 路由器（从型号推断）
+  if (/router|rt-|ar\d|ne\d|crs|mx\d/i.test(nd.model||'')) return DEVICE_ICONS.router;
+  // 防火墙
+  if (/firewall|fw-|usg|ngfw|secospace|hillstone/i.test(nd.model||'')) return DEVICE_ICONS.firewall;
+  // 默认交换机
+  return DEVICE_ICONS.switch;
+}
+
+// 根据设备角色计算节点尺寸
+function getNodeSize(nd) {
+  if (nd.role === 'core') return { w: 150, h: 72, iconSize: 26, fontSize: 12 };
+  return { w: 110, h: 56, iconSize: 20, fontSize: 10 };
+}
 
 var LKCOLOR = {
   '10G Ethernet':'#3fb950','1G Ethernet':'#388bfd',
@@ -367,7 +414,12 @@ var LKCOLOR = {
   '万兆光纤':'#3fb950','千兆以太网':'#388bfd','百兆以太网':'#388bfd',
   '以太网':'#388bfd','LAG 聚合':'#bc8cff','40G 光纤':'#d29922','100G 光纤':'#f78166','25G 光纤':'#39d353'
 };
-var VCOLOR = {huawei:'#e0302a',cisco:'#0077c8',h3c:'#00c864',ruijie:'#ffa000',generic:'#888888'};
+var VCOLOR = {
+  huawei:'#e0302a', cisco:'#0077c8', h3c:'#00c864', ruijie:'#ffa000',
+  juniper:'#84b135', arista:'#5a3e9e', zte:'#0099cc',
+  hikvision:'#e4002b', dahua:'#ff6600', tplink:'#1ba784', dell:'#007db8',
+  generic:'#888888'
+};
 
 // ═══ 日志 ═══
 function log(msg, tp) {
@@ -701,7 +753,7 @@ function calcPos(nodes, ly) {
     var layers=[cores,acc];
     layers.forEach(function(layer,li){
       if(!layer.length)return;
-      var y=100+li*220;
+      var y=120+li*250;
       layer.forEach(function(n,i){ pos[n.id]={x:W/(layer.length+1)*(i+1),y:y}; });
     });
     return pos;
@@ -776,44 +828,65 @@ function renderTopo(){
   // 节点
   topo.nodes.forEach(function(nd){
     var pos=nodePos[nd.id]; if(!pos) return;
+    var sz = getNodeSize(nd);
+    var w = sz.w, h = sz.h;
+
     var g=svgEl('g',{});
-    g.setAttribute('transform','translate('+(pos.x-NW/2)+','+(pos.y-NH/2)+')');
+    g.setAttribute('transform','translate('+(pos.x-w/2)+','+(pos.y-h/2)+')');
     g.style.cursor='pointer';
 
     var isCore=nd.role==='core';
     var isSel=selNode===nd.id;
-    var vc=VCOLOR[nd.device_type]||'#888';
+    var vc=VCOLOR[nd.device_type]||VCOLOR.generic||'#888';
 
+    // 选中发光
     if(isSel){
-      var gl=svgEl('rect',{x:-4,y:-4,width:NW+8,height:NH+8,rx:12,fill:'none',stroke:'#388bfd','stroke-width':2,filter:'url(#glow)'});
+      var gl=svgEl('rect',{x:-4,y:-4,width:w+8,height:h+8,rx:14,fill:'none',stroke:'#388bfd','stroke-width':2,filter:'url(#glow)'});
       g.appendChild(gl);
     }
 
-    var bg=svgEl('rect',{width:NW,height:NH,rx:8,fill:isCore?'#162032':'#21262d',stroke:isSel?'#388bfd':(isCore?'#1f6feb':vc),'stroke-width':isCore?2:1});
+    // 核心设备：圆角方框 + 双层边框
+    if(isCore){
+      var outerBg=svgEl('rect',{width:w,height:h,rx:10,fill:'#0d1117',stroke:vc,'stroke-width':3,opacity:0.5});
+      g.appendChild(outerBg);
+    }
+
+    // 背景
+    var bg=svgEl('rect',{width:w,height:h,rx:8,fill:isCore?'#162032':'#21262d',stroke:isSel?'#388bfd':(isCore?vc:'#30363d'),'stroke-width':isCore?2:1});
     g.appendChild(bg);
 
-    var bar=svgEl('rect',{width:NW,height:5,rx:8,fill:vc});
+    // 顶部颜色条
+    var bar=svgEl('rect',{width:w,height:isCore?5:4,rx:8,fill:vc});
     g.appendChild(bar);
 
-    // 图标
-    var ico=svgEl('text',{x:14,y:30,'font-size':18});
-    ico.textContent=isCore?'🔷':'🔲';
-    g.appendChild(ico);
+    // 设备图标（SVG）
+    var iconG=svgEl('g',{transform:'translate(8,'+(isCore?16:14)+')',width:sz.iconSize,height:sz.iconSize,style:'color:'+vc});
+    iconG.innerHTML = getDeviceIcon(nd);
+    // 缩放图标到目标尺寸
+    var svgUse = iconG.querySelector('svg');
+    g.appendChild(iconG);
+
+    // 文字区域（图标右侧）
+    var txtX = 12 + sz.iconSize + 6;
 
     // 主机名
-    var nm=nd.hostname.length>12?nd.hostname.slice(0,11)+'…':nd.hostname;
-    g.appendChild(svgTxt(NW/2+8, 24, nm, '#e6edf3', 11, true));
+    var maxNmLen = Math.floor((w - txtX - 16) / (sz.fontSize * 0.6));
+    var nm=nd.hostname||'';
+    if(nm.length>maxNmLen) nm=nm.slice(0,maxNmLen-1)+'…';
+    g.appendChild(svgTxt(txtX, isCore?24:20, nm, '#e6edf3', sz.fontSize, true));
 
     // IP
-    g.appendChild(svgTxt(NW/2+8, 36, nd.ip||'', '#6e7681', 9));
+    g.appendChild(svgTxt(txtX, (isCore?24:20)+14, nd.ip||'', '#6e7681', sz.fontSize-2));
 
     // 型号
-    var ml=(nd.model||''); if(ml.length>15)ml=ml.slice(0,14)+'…';
-    g.appendChild(svgTxt(NW/2+8, 48, ml, vc, 8));
+    if(isCore){
+      var ml=(nd.model||''); if(ml.length>20)ml=ml.slice(0,19)+'…';
+      g.appendChild(svgTxt(txtX, 52, ml, vc, 8));
+    }
 
     // 状态灯
     var sc=nd.status==='online'?'#3fb950':nd.status==='warning'?'#d29922':'#f85149';
-    g.appendChild(svgEl('circle',{cx:NW-8,cy:9,r:4,fill:sc}));
+    g.appendChild(svgEl('circle',{cx:w-10,cy:10,r:isCore?5:4,fill:sc}));
 
     // 事件
     (function(node){
@@ -998,10 +1071,23 @@ window.onload = function(){
   console.log('[INIT] scanBtn exists:', !!document.getElementById('scanBtn'));
   console.log('[INIT] lblBtn exists:', !!document.getElementById('lblBtn'));
   log('系统已就绪，欢迎使用网络拓扑管理系统','ok');
-  log('点击「加载演示数据」立即体验','info');
   checkApi();
   var lblBtn = document.getElementById('lblBtn');
   if(lblBtn) lblBtn.className='btn-sm on';
+  // 自动尝试加载缓存拓扑
+  setTimeout(function(){
+    if(apiOk){
+      fetch(API+'/topology').then(function(r){ return r.json(); }).then(function(d){
+        if(d && d.nodes && d.nodes.length > 0){
+          loadTopoData(d);
+          var cacheTime = d.savedAt ? new Date(d.savedAt).toLocaleString() : '';
+          log('已自动加载上次拓扑：'+d.nodes.length+' 台设备，'+(d.links||[]).length+' 条链路'+(cacheTime?' ('+cacheTime+')':''),'ok');
+        } else {
+          log('暂无缓存拓扑，请扫描或加载演示数据','info');
+        }
+      }).catch(function(){});
+    }
+  }, 1500);
   console.log('[INIT] window.onload complete');
 };
 setInterval(checkApi, 30000);

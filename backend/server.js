@@ -12,6 +12,7 @@ const snmp = require('net-snmp');
 const net = require('net');
 const os = require('os');
 const path = require('path');
+const fs = require('fs');
 
 // ── 全局错误处理，防止进程崩溃 ──
 process.on('uncaughtException', (err) => {
@@ -33,6 +34,46 @@ app.use(express.static(path.join(__dirname, '../')));
 // ============================================================
 let scanStatus = { running: false, progress: 0, message: '' };
 let lastTopology = { nodes: [], links: [] };
+
+// 拓扑缓存文件路径（与 server.js 同目录的 data/ 下）
+const CACHE_DIR = path.join(__dirname, 'data');
+const CACHE_FILE = path.join(CACHE_DIR, 'topology-cache.json');
+
+// 启动时自动加载缓存
+try {
+  if (fs.existsSync(CACHE_FILE)) {
+    const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    if (cached && cached.nodes && cached.nodes.length > 0) {
+      lastTopology = cached;
+      console.log('[CACHE] 已加载拓扑缓存：' + cached.nodes.length + ' 台设备，' + (cached.links || []).length + ' 条链路');
+      scanStatus.message = '已加载上次扫描结果（' + cached.nodes.length + ' 台设备），点击"重新扫描"更新';
+    }
+  }
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.log('[CACHE] 加载缓存失败：' + e.message);
+  if (!fs.existsSync(CACHE_DIR)) {
+    try { fs.mkdirSync(CACHE_DIR, { recursive: true }); } catch (_) {}
+  }
+}
+
+// 保存拓扑到缓存文件
+function saveCache(topology) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    const data = {
+      nodes: topology.nodes,
+      links: topology.links,
+      savedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(CACHE_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log('[CACHE] 拓扑已缓存：' + data.nodes.length + ' 台设备');
+  } catch (e) {
+    console.log('[CACHE] 保存缓存失败：' + e.message);
+  }
+}
 
 // ============================================================
 // SSH 工具函数
@@ -224,8 +265,28 @@ function detectVendor(banner, snmpDescr) {
   // Arista
   if (combined.includes('arista') || combined.includes('eos')) return 'arista';
 
-  // 中兴
+  // 中兴（ZTE/ZXR10）
   if (combined.includes('zte') || combined.includes('zxr')) return 'zte';
+
+  // 海康威视（Hikvision）— 监控交换机/IPC/NVR
+  if (combined.includes('hikvision') || combined.includes('hik-') ||
+      combined.includes('ds-3e') || combined.includes('ds-2c') ||
+      combined.includes('ds-2d') || combined.includes('ds-7')) return 'hikvision';
+
+  // 大华（Dahua）
+  if (combined.includes('dahua') || combined.includes('dhi-') ||
+      combined.includes('dh-') || combined.includes('ipc-')) return 'dahua';
+
+  // TP-Link（企业级交换机）
+  if (combined.includes('tp-link') || combined.includes('tplink') ||
+      combined.includes('tl-sg') || combined.includes('tl-sl')) return 'tplink';
+
+  // Ruijie Reyee（锐捷睿易）— 智能网络
+  if (combined.includes('reyee') || combined.includes('eap')) return 'ruijie';
+
+  // Dell（PowerSwitch）
+  if (combined.includes('dell') || combined.includes('powerconnect') ||
+      combined.includes('os6') || combined.includes('os10')) return 'dell';
 
   // 再宽泛匹配 IOS（防止 show version 里只有 IOS）
   if (combined.includes(' ios ') && !combined.includes('bios')) return 'cisco';
@@ -1285,6 +1346,8 @@ app.post('/api/scan', async (req, res) => {
     lastTopology = buildTopology(collectedDevices);
     // 附加所有设备信息
     lastTopology.allDevices = collectedDevices;
+    // 自动保存缓存
+    saveCache(lastTopology);
 
     const successDevices = collectedDevices.filter(d => !d.error);
     const sshSuccessCount = collectedDevices.filter(d => d.sshOk).length;
@@ -1302,6 +1365,40 @@ app.post('/api/scan', async (req, res) => {
 // 获取最新拓扑
 app.get('/api/topology', (req, res) => {
   res.json(lastTopology);
+});
+
+// 获取缓存状态
+app.get('/api/cache-status', (req, res) => {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const stat = fs.statSync(CACHE_FILE);
+      const cached = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      res.json({
+        hasCache: true,
+        deviceCount: (cached.nodes || []).length,
+        linkCount: (cached.links || []).length,
+        savedAt: cached.savedAt || stat.mtime.toISOString(),
+        fileSize: stat.size
+      });
+    } else {
+      res.json({ hasCache: false });
+    }
+  } catch (e) {
+    res.json({ hasCache: false });
+  }
+});
+
+// 清除缓存
+app.post('/api/cache-clear', (req, res) => {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      fs.unlinkSync(CACHE_FILE);
+    }
+    lastTopology = { nodes: [], links: [] };
+    res.json({ ok: true });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
 });
 
 // 演示数据（用于测试）
