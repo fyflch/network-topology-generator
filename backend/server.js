@@ -452,17 +452,20 @@ function _formatBps(bps, portName) {
 // guessLinkType 只看端口名，不要用 sys_desc（那是设备型号描述，会误判）
 function guessLinkType(portName) {
   const p = (portName || '').toLowerCase();
-  if (p.includes('100ge') || p.includes('hundredgig')) return { type: '100G 光纤', speed: '100Gbps' };
-  if (p.includes('40g') || p.includes('fortygig'))    return { type: '40G 光纤', speed: '40Gbps' };
-  if (p.includes('25g'))                               return { type: '25G 光纤', speed: '25Gbps' };
-  if (p.includes('tengig') || p.includes('10ge') || p.includes('xg')) {
-    return { type: '万兆光纤', speed: '10Gbps' };
+  // 返回值 key 与前端 LKCOLOR 对应，确保颜色映射生效
+  if (p.includes('100ge') || p.includes('hundredgig')) return { type: '100G Ethernet', speed: '100Gbps' };
+  if (p.includes('40g') || p.includes('fortygig'))        return { type: '40G Ethernet',  speed: '40Gbps'  };
+  if (p.includes('25g'))                                  return { type: '25G Ethernet',  speed: '25Gbps'  };
+  // Ten-GigabitEthernet / TenGigabitEthernet / XGigabitEthernet / 10ge / xge
+  if (p.includes('ten') || p.includes('10ge') || p.includes('xge') || p.startsWith('xg')) {
+    return { type: '10G Ethernet', speed: '10Gbps' };
   }
-  if (p.includes('lag') || p.includes('eth-trunk') || p.includes('port-channel') || p.includes('agg') || p.includes('po')) {
-    return { type: 'LAG 聚合', speed: '聚合链路' };
+  if (p.includes('lag') || p.includes('eth-trunk') || p.includes('port-channel') || p.includes('aggreg')) {
+    return { type: 'LAG 聚合链路', speed: '聚合链路' };
   }
-  if (p.includes('gig') || p.includes('ge') || p.includes('gi')) {
-    return { type: '千兆以太网', speed: '1Gbps' };
+  // GigabitEthernet / Gi / ge（注意 ge 要放在 xge 后面，避免误匹配 TenGigabitEthernet）
+  if (p.includes('gigabit') || p.includes('gige') || /\bgi\b/.test(p) || /\bge\b/.test(p)) {
+    return { type: '1G Ethernet', speed: '1Gbps' };
   }
   if (p.includes('fa') || p.includes('fast') || p.includes('100m')) {
     return { type: '百兆以太网', speed: '100Mbps' };
@@ -523,13 +526,23 @@ function snmpGetLLDPNeighbors(host, community, timeout) {
     const base = '1.0.8802.1.1.2.1.4.1.1';  // lldpRemTable columns base
 
     // 统一 Walk 这几个字段
+    // LLDP-MIB lldpRemTable 字段说明：
+    //   .3  lldpRemLocalPortId  = 本端端口在 lldpRemTable 中的索引（即 LLDP localPortNum，对应 ifIndex）
+    //   .5  lldpRemChassisId    = 对端底盘ID（MAC/IP）
+    //   .6  lldpRemPortIdSubtype= 对端端口ID类型（1=接口别名,3=MAC,5=接口名,7=本地值）
+    //   .7  lldpRemPortId       = 对端端口ID（格式由.6决定；5=接口名最准确）
+    //   .8  lldpRemPortDesc     = 对端端口描述（接口description，可能是别名如"Uplink"）
+    //   .9  lldpRemSysName      = 对端设备名
+    //   .10 lldpRemSysDesc      = 对端系统描述
+    // 结论：本端端口名只能通过 _localIfIdx 反查 ifDescr (ifTable OID 1.3.6.1.2.1.2.2.1.2)
     const fields = [
-      { name: 'chassisId',  oid: base + '.5' },
-      { name: 'portId',     oid: base + '.7' },
-      { name: 'portDesc',   oid: base + '.8' },
-      { name: 'sysName',    oid: base + '.9' },
-      { name: 'sysDesc',    oid: base + '.10' },
-      { name: 'localPort',  oid: base + '.3' },
+      { name: 'chassisId',       oid: base + '.5' },
+      { name: 'portIdSubtype',   oid: base + '.6' },
+      { name: 'portId',          oid: base + '.7' },
+      { name: 'portDesc',        oid: base + '.8' },
+      { name: 'sysName',         oid: base + '.9' },
+      { name: 'sysDesc',         oid: base + '.10' },
+      { name: 'localPortNumRaw', oid: base + '.3' },  // lldpRemLocalPortId（很多设备这里是ifIndex数字）
     ];
 
     const session = snmp.createSession(host, community, {
@@ -600,17 +613,36 @@ function snmpGetLLDPNeighbors(host, community, timeout) {
               if (n.chassisId && /^[0-9a-f]{12}$/i.test(n.chassisId.replace(/[^0-9a-fA-F]/g,''))) {
                 neighborMac = formatMac(n.chassisId);
               }
-              // 本地端口：先从 ifDescr 查，再 fallback
-              const localPort = ifDescrMap[n._localIfIdx]
-                || n.localPort
-                || `GigabitEthernet 0/${n._localIfIdx}`;
-              // 远端端口：portDesc 是最可读的端口名（如 GigabitEthernet 0/48）
-              const remotePort = n.portDesc || n.portId || '';
+
+              // ── 本端端口名：必须通过 ifDescr 反查，OID 1.3.6.1.2.1.2.2.1.2.<ifIndex> ──
+              // _localIfIdx 是 lldpRemTable OID 索引倒数第二段（即 LLDP localPortNum = ifIndex）
+              const localPort = ifDescrMap[n._localIfIdx]       // ifDescr（"GigabitEthernet1/0/24"）
+                             || `GigabitEthernet 0/${n._localIfIdx}`;  // 兜底
+
+              // ── 对端端口名：优先 portId（.7），类型5=接口名最准确 ──
+              // portIdSubtype=5 表示接口名，portIdSubtype=1/7 可能是别名或描述文字
+              // portId 若含 "/" 说明是端口号格式，直接用；否则 fallback 到 portDesc
+              const pid = n.portId || '';
+              const pSubtype = String(n.portIdSubtype || '');
+              let remotePort;
+              if (pSubtype === '5' || /\//.test(pid)) {
+                // 接口名格式（GigabitEthernet1/0/24）或明确是接口名类型
+                remotePort = pid;
+              } else if (pid && !/Interface$/i.test(pid) && !/^[0-9a-f:]{11,}$/i.test(pid)) {
+                // portId 不是 MAC 也不是带 "Interface" 后缀描述，可用
+                remotePort = pid;
+              } else {
+                // portDesc 去掉末尾 " Interface" 后缀
+                remotePort = (n.portDesc || '').replace(/ Interface$/i, '').trim() || pid;
+              }
+
               neighbors.push({
                 neighborId,
-                localPort,                   // ifDescr 字符串，如 "TenGigabitEthernet 1/48"
-                localIfIdx: n._localIfIdx,   // 纯数字 ifIndex，如 "48"（用于查 ifSpeedMap）
-                portDesc: remotePort,
+                localPort,                    // 本端端口名（ifDescr 反查）
+                localIfIdx: n._localIfIdx,    // 本端 ifIndex 数字（用于查 ifSpeedMap）
+                portId:    pid,               // 对端端口ID（lldpRemPortId）
+                portDesc:  remotePort,        // 对端端口最终显示值
+                portIdSubtype: pSubtype,
                 sysName: n.sysName || '',
                 sysDesc: n.sysDesc || '',
                 chassisId: n.chassisId || '',
@@ -874,17 +906,81 @@ async function collectDevice(ip, sshPort, username, password, snmpCommunity) {
     try {
       const snmpNeighbors = await snmpGetLLDPNeighbors(ip, snmpCommunity, 6000);
       if (snmpNeighbors && snmpNeighbors.length > 0) {
-        // 将 SNMP 邻居格式统一为与 SSH LLDP 相同的字段名
-        // 关键：localIfIdx 是纯数字 ifIndex（用于查 ifSpeedMap）
-        //       localPort 是 ifDescr 字符串（用于显示）
+        // 建立 ifDescr 全表反向索引：ifDescr → ifIndex（存全部端口，不过滤）
+        const ifDescrToIdx = {};
+        for (const idx of Object.keys(device.ifSpeedMap)) {
+          const descr = device.ifDescrByName[idx] || '';
+          if (descr) ifDescrToIdx[descr] = idx;
+        }
+
         const converted = snmpNeighbors.map(n => {
-          const ifIdx = n.localIfIdx || '';
-          const bps = device.ifSpeedMap[ifIdx] || 0;
+          // 本端端口名：n.localPort 已是 ifDescr 反查结果（如 "GigabitEthernet1/0/24"）
+          const displayPort = n.localPort || String(n.localIfIdx || '');
+
+          // 速度查找：优先 ifIndex 直接查 ifSpeedMap（最准确）
+          let bps = 0;
+          // 第一层：ifIndex 直接查（LLDP OID 的 index = ifIndex）
+          if (n.localIfIdx) bps = device.ifSpeedMap[String(n.localIfIdx)] || 0;
+          // 第二层：本端 ifDescr 精确匹配（ifDescr 去空格）
+          if (bps === 0 && n.localPort) {
+            const lpClean = n.localPort.replace(/ /g, '');
+            for (const [descr, idx] of Object.entries(ifDescrToIdx)) {
+              if (descr.replace(/ /g, '') === lpClean) {
+                bps = device.ifSpeedMap[idx] || 0;
+                if (bps > 0) break;
+              }
+            }
+          }
+          // 第三层：本端端口号尾部模糊匹配（处理 slot 编号差异）
+          if (bps === 0 && n.localPort) {
+            const portTail = n.localPort.replace(/^[A-Za-z\-\s]+/, '').replace(/ /g, '');
+            if (portTail && /\//.test(portTail)) {
+              for (const [descr, idx] of Object.entries(ifDescrToIdx)) {
+                const dTail = descr.replace(/^[A-Za-z\-\s]+/, '').replace(/ /g, '');
+                if (dTail === portTail) {
+                  bps = device.ifSpeedMap[idx] || 0;
+                  if (bps > 0) break;
+                }
+              }
+            }
+          }
+          // 第四层：纯数字 ifIndex 容错
+          if (bps === 0) {
+            for (const k of Object.keys(device.ifSpeedMap)) {
+              if (String(k) === String(n.localIfIdx)) { bps = device.ifSpeedMap[k]; break; }
+            }
+          }
+          // 特殊值：SNMP ifSpeed=4294967295 表示"自动协商/未知"，视为 10Gbps
+          if (bps === 0xFFFFFFFF) bps = 10000000000;
+          // 端口类型强制覆盖：本端端口名含 Ten-Gigabit/XGigabit 但 ifSpeed ≤ 1G
+          // 原因：SNMP auto-negotiate 口可能报 1G，但物理口是 10G
+          if (bps > 0 && bps <= 1000000000) {
+            const portLower = (n.localPort || '').toLowerCase();
+            if (portLower.includes('ten') || portLower.includes('xgig') || portLower.includes('10g')) {
+              bps = 10000000000; // 10Gbps
+            } else if (portLower.includes('fortygig') || portLower.includes('40g')) {
+              bps = 40000000000;
+            } else if (portLower.includes('hundredgig') || portLower.includes('100g')) {
+              bps = 100000000000;
+            }
+          }
+
+          const speedStr = bps > 0 ? _formatBps(bps, displayPort) : '';
+          // 调试日志
+          if (bps === 0) {
+            const keys = Object.keys(ifDescrToIdx).slice(0, 3);
+            console.log('[snmp-lldp] ' + ip + ' ifIdx=' + (n.localIfIdx||'')
+              + ' localPort=' + displayPort + ' ifDescr(sample)=' + keys.join(',') + ' → bps=0');
+          } else {
+            console.log('[snmp-lldp] ' + ip + ' ifIdx=' + (n.localIfIdx||'')
+              + ' localPort=' + displayPort + ' bps=' + bps + ' speed=' + speedStr);
+          }
+
           return {
-            local_port:  n.localPort  || ifIdx,  // 优先用 ifDescr 字符串（显示用）
-            local_speed: bps > 0 ? _formatBps(bps, n.localPort) : '',
+            local_port:  displayPort,        // 本端端口名（ifDescr，如 "GigabitEthernet1/0/24"）
+            local_speed: speedStr,
             remote_name: n.sysName    || n.neighborId || 'Unknown',
-            remote_port: n.portId     || n.portDesc   || '',
+            remote_port: n.portDesc   || '',  // 对端端口（已处理好的最佳值）
             remote_mgmt: extractIpFromChassisId(n.chassisId),
             port_desc:   n.portDesc   || '',
             sys_desc:    n.sysDesc    || '',
@@ -976,7 +1072,7 @@ function buildTopology(devices) {
       if (linkSet.has(devPair)) return;
       linkSet.add(devPair);
 
-      // guessLinkType(portName) 不再接收 sys_desc，避免交换机型号字符串误判速率
+      // guessLinkType 用本端端口名（local_port = ifDescr，如 "GigabitEthernet1/0/24"）判断颜色/速率
       const lt = guessLinkType(nb.local_port);
       // 优先使用 SNMP 采集的真实接口速率
       const realSpeed = nb.local_speed || nb.localSpeed || '';
@@ -1064,6 +1160,39 @@ function tcpProbe(host, port, timeout) {
 }
 
 // ============================================================
+// SNMP 快速探测（UDP，只取 sysDescr，用于判断主机是否响应 SNMP）
+// ============================================================
+function snmpProbe(host, community, timeout) {
+  return new Promise((resolve) => {
+    const SYS_DESCR = '1.3.6.1.2.1.1.1.0';
+    let done = false;
+    let session;
+    const to = timeout || 2000;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      try { session && session.close(); } catch (_) {}
+      console.log('[snmpProbe] TIMEOUT: ' + host);
+      resolve(false);
+    }, to);
+    try {
+      session = snmp.createSession(host, community, { timeout: to, retries: 0, version: snmp.Version2c });
+      session.get([SYS_DESCR], (err, vbs) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        try { session.close(); } catch (_) {}
+        const ok = !err && vbs && vbs.length > 0;
+        console.log('[snmpProbe] ' + (ok ? 'OK' : 'FAIL') + ': ' + host + (err ? ' err=' + err.message : ''));
+        resolve(ok);
+      });
+    } catch (e) {
+      if (!done) { done = true; clearTimeout(timer); console.log('[snmpProbe] EXC: ' + host + ' ' + e.message); resolve(false); }
+    }
+  });
+}
+
+// ============================================================
 // API 路由
 // ============================================================
 
@@ -1107,26 +1236,34 @@ app.post('/api/scan', async (req, res) => {
     const maxConcur = Math.min(parseInt(concurrency) || 10, 20);
     const reachable = [];
 
-    // 第一阶段：TCP 探测
-    scanStatus.message = `TCP 探测中... (0/${ips.length})`;
+    // 第一阶段：SNMP 探测（主要手段） + TCP 22 兜底
+    // 只要 SNMP 响应 OR SSH 端口通，就认为在线
+    scanStatus.message = `主机探测中... (0/${ips.length})`;
     let probed = 0;
 
     for (let i = 0; i < ips.length; i += maxConcur) {
       const batch = ips.slice(i, i + maxConcur);
-      const results = await Promise.all(batch.map(ip => tcpProbe(ip, ssh_port || 22, 1500)));
+      const results = await Promise.all(batch.map(ip =>
+        Promise.all([
+          snmpProbe(ip, snmp_community || 'public', 2000),
+          tcpProbe(ip, ssh_port || 22, 1500)
+        ]).then(([snmpOk, tcpOk]) => snmpOk || tcpOk)
+      ));
       results.forEach((ok, j) => {
         if (ok) reachable.push(batch[j]);
         probed++;
       });
       scanStatus.progress = Math.round((probed / ips.length) * 40);
-      scanStatus.message = `TCP 探测中... (${probed}/${ips.length})，在线: ${reachable.length}`;
+      scanStatus.message = `主机探测中... (${probed}/${ips.length})，发现: ${reachable.length}`;
     }
 
     if (reachable.length === 0) {
+      console.log('[scan] No reachable devices found. All IPs: ' + ips.join(', '));
       scanStatus = { running: false, progress: 100, message: '未发现在线设备', total: ips.length, done: ips.length, found: 0 };
       lastTopology = { nodes: [], links: [] };
       return;
     }
+    console.log('[scan] Reachable IPs: ' + reachable.join(', '));
 
     // 第二阶段：SSH 采集
     const collectedDevices = [];

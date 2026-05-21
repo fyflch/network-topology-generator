@@ -299,6 +299,46 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
 </div><!-- /main -->
 
 <script>
+// ═══ IE11 兼容：fetch polyfill (XMLHttpRequest 实现) ═══
+if (typeof fetch === 'undefined') {
+  window.fetch = function(url, options) {
+    options = options || {};
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open(options.method || 'GET', url, true);
+      var headers = options.headers || {};
+      for (var h in headers) { if (headers.hasOwnProperty(h)) xhr.setRequestHeader(h, headers[h]); }
+      xhr.onload = function() {
+        var resp = {
+          ok: xhr.status >= 200 && xhr.status < 300,
+          status: xhr.status,
+          statusText: xhr.statusText,
+          json: function() { return Promise.resolve(JSON.parse(xhr.responseText)); },
+          text: function() { return Promise.resolve(xhr.responseText); }
+        };
+        resolve(resp);
+      };
+      xhr.onerror = function() { reject(new Error('Network error')); };
+      xhr.ontimeout = function() { reject(new Error('Timeout')); };
+      if (options.signal) {
+        options.signal.addEventListener('abort', function() { xhr.abort(); reject(new Error('Aborted')); });
+      }
+      xhr.send(options.body || null);
+    });
+  };
+}
+// ═══ IE11 兼容：Promise 基础检测 ═══
+if (typeof Promise === 'undefined') {
+  alert('您的浏览器版本过低，请升级到 IE11 或使用 Edge/Chrome 浏览器访问本系统。');
+}
+// ═══ IE11 兼容：AbortController stub ═══
+if (typeof AbortController === 'undefined') {
+  window.AbortController = function() {
+    this.signal = { aborted: false, addEventListener: function(){} };
+    this.abort = function() { this.signal.aborted = true; };
+  };
+}
+
 // ═══ 全局错误捕获 ═══
 window.onerror = function(msg, src, line, col, err) {
   console.error('[JS ERROR] Line ' + line + ': ' + msg + (err && err.stack ? '\n' + err.stack : ''));
@@ -309,7 +349,7 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 // ═══ 状态 ═══
-var API = 'http://localhost:5000/api';
+var API = location.protocol + '//' + location.host + '/api';
 var devices = [], topo = {nodes:[],links:[]};
 var selNode = null, showLbl = true, layout = 'auto';
 var apiOk = false;
@@ -322,7 +362,10 @@ var NW = 104, NH = 58;
 var LKCOLOR = {
   '10G Ethernet':'#3fb950','1G Ethernet':'#388bfd',
   'LAG 聚合链路':'#bc8cff','25G Ethernet':'#39d353',
-  '40G Ethernet':'#d29922','100G Ethernet':'#f78166'
+  '40G Ethernet':'#d29922','100G Ethernet':'#f78166',
+  // 中文标签兜底（兼容旧版/演示数据）
+  '万兆光纤':'#3fb950','千兆以太网':'#388bfd','百兆以太网':'#388bfd',
+  '以太网':'#388bfd','LAG 聚合':'#bc8cff','40G 光纤':'#d29922','100G 光纤':'#f78166','25G 光纤':'#39d353'
 };
 var VCOLOR = {huawei:'#e0302a',cisco:'#0077c8',h3c:'#00c864',ruijie:'#ffa000',generic:'#888888'};
 
@@ -501,9 +544,10 @@ function loadTopoData(d) {
       role: (x.neighborCount && x.neighborCount >= 3) ? 'core' : 'access',
       neighbors: (x.neighbors || []).map(function(nb){
         return {
-          local_port: nb.local_port,
+          local_port: portNum(nb.local_port) || nb.local_port || '',
+          local_speed: nb.local_speed || '',
           neighbor_device: nb.remote_name || nb.remote_mgmt || '',
-          neighbor_port: nb.remote_port,
+          neighbor_port: portNum(nb.remote_port) || nb.remote_port || '',
           link_type: nb.link_type || guessLinkType(nb.local_port)
         };
       })
@@ -535,10 +579,10 @@ function loadTopoData(d) {
       return {
         source: sNode ? (sNode.label||sNode.id) : l.source,
         target: tNode ? (tNode.label||tNode.id) : l.target,
-        source_port: l.source_port || '',
-        target_port: l.target_port || '',
+        source_port: portNum(l.source_port) || '',
+        target_port: portNum(l.target_port) || '',
         link_type: l.link_type || '以太网',
-        speed: l.speed || '未知'
+        speed: l.speed || l.local_speed || '未知'
       };
     })
   };
@@ -555,6 +599,12 @@ function _render() {
   document.getElementById('emptyTip').style.display = 'none';
 }
 
+// 清理端口名：去掉末尾的 " Interface" 描述后缀，保留完整端口名（如 "Ten-GigabitEthernet1/0/28"）
+function portNum(p) {
+  if (!p) return '';
+  return String(p).replace(/ Interface$/i, '').trim() || p;
+}
+
 function buildTopo(dvs) {
   var nodes = dvs.map(function(d){ return {id:d.hostname,ip:d.ip,hostname:d.hostname,vendor:d.vendor,model:d.model,version:d.version,device_type:d.device_type,role:d.role||'access',status:d.status}; });
   var links = [], seen = {};
@@ -564,7 +614,7 @@ function buildTopo(dvs) {
       if(!seen[k]){
         seen[k]=1;
         var lt = n.link_type || guessLinkType(n.local_port);
-        links.push({source:d.hostname,target:n.neighbor_device,source_port:n.local_port,target_port:n.neighbor_port,link_type:lt,speed:guessSpeed(n.local_port)});
+        links.push({source:d.hostname,target:n.neighbor_device,source_port:portNum(n.local_port),target_port:portNum(n.neighbor_port),link_type:lt,speed:n.local_speed||guessSpeed(n.local_port)});
       }
     });
   });
@@ -916,8 +966,10 @@ function exportSVG(){
 
 // ═══ 页面切换 ═══
 function gotoPage(name, btn){
-  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
-  document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+  var pages = document.querySelectorAll('.page');
+  for (var _i=0;_i<pages.length;_i++) pages[_i].classList.remove('active');
+  var tabs = document.querySelectorAll('.nav-tab');
+  for (var _j=0;_j<tabs.length;_j++) tabs[_j].classList.remove('active');
   document.getElementById('page-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   else {
