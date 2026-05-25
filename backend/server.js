@@ -40,6 +40,7 @@ let lastScanCommunity = 'public'; // 记录最近一次扫描使用的 SNMP comm
 // 拓扑缓存文件路径（与 server.js 同目录的 data/ 下）
 const CACHE_DIR = path.join(__dirname, 'data');
 const CACHE_FILE = path.join(CACHE_DIR, 'topology-cache.json');
+const LAYOUT_FILE = path.join(CACHE_DIR, 'layout-cache.json');
 
 // 启动时自动加载缓存
 try {
@@ -75,6 +76,41 @@ function saveCache(topology) {
   } catch (e) {
     console.log('[CACHE] 保存缓存失败：' + e.message);
   }
+}
+
+// 保存布局（节点坐标、视图状态）
+function saveLayout(layoutData) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    const data = {
+      nodePos: layoutData.nodePos || {},
+      scale: layoutData.scale || 1,
+      tx: layoutData.tx || 0,
+      ty: layoutData.ty || 0,
+      layout: layoutData.layout || 'auto',
+      savedAt: new Date().toISOString()
+    };
+    fs.writeFileSync(LAYOUT_FILE, JSON.stringify(data, null, 2), 'utf8');
+    console.log('[LAYOUT] 布局已保存，节点数：' + Object.keys(data.nodePos).length);
+  } catch (e) {
+    console.log('[LAYOUT] 保存布局失败：' + e.message);
+  }
+}
+
+// 加载布局
+function loadLayout() {
+  try {
+    if (fs.existsSync(LAYOUT_FILE)) {
+      const data = JSON.parse(fs.readFileSync(LAYOUT_FILE, 'utf8'));
+      if (data && data.nodePos) {
+        console.log('[LAYOUT] 已加载布局缓存，节点数：' + Object.keys(data.nodePos).length);
+        return data;
+      }
+    }
+  } catch (e) {
+    console.log('[LAYOUT] 加载布局失败：' + e.message);
+  }
+  return null;
 }
 
 // ============================================================
@@ -1613,7 +1649,8 @@ app.post('/api/scan', async (req, res) => {
 
 // 获取最新拓扑
 app.get('/api/topology', (req, res) => {
-  res.json(lastTopology);
+  const layout = loadLayout();
+  res.json(Object.assign({}, lastTopology, { layout: layout }));
 });
 
 // 获取缓存状态
@@ -2108,6 +2145,21 @@ app.delete('/api/link/remove', (req, res) => {
   console.log('[LINK/REMOVE] 删除链路: ' + source + ' <-> ' + target);
 
   res.json({ ok: true, removed: removed, topology: lastTopology });
+});
+
+// ============================================================
+
+// 布局保存 API
+// POST /api/layout/save
+// body: { nodePos, scale, tx, ty, layout }
+// ============================================================
+app.post('/api/layout/save', (req, res) => {
+  const { nodePos, scale, tx, ty, layout } = req.body || {};
+  if (!nodePos || typeof nodePos !== 'object') {
+    return res.status(400).json({ error: 'nodePos 为必填项' });
+  }
+  saveLayout({ nodePos, scale, tx, ty, layout });
+  res.json({ ok: true, savedAt: new Date().toISOString() });
 });
 
 // ============================================================

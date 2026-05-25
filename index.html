@@ -459,7 +459,9 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
         </div>
         <div class="t-group">
           <button class="btn-sm" id="lblBtn" onclick="toggleLabel()">🏷 标签</button>
-          <button class="btn-sm" onclick="exportSVG()">💾 导出</button>
+          <button class="btn-sm" onclick="exportSVG()">💾 SVG</button>
+          <button class="btn-sm" onclick="exportTopologyJSON()">📦 导出JSON</button>
+          <button class="btn-sm" onclick="importTopologyJSON()">📂 导入JSON</button>
           <button class="btn-sm" onclick="openAddPanel()" style="border-color:#3fb950;color:#3fb950">➕ 添加设备</button>
           <button class="btn-sm" id="lkEditBtn" onclick="openLinkPanel()" style="border-color:#bc8cff;color:#bc8cff">✏️ 链路编辑</button>
         </div>
@@ -863,7 +865,18 @@ function loadTopoData(d) {
   };
   // 保留重新扫描前已有的手动链路（manual:true 不被覆盖）
   var prevManualLinks = topo.links ? topo.links.filter(function(l){ return l.manual === true; }) : [];
-  nodePos = {};
+  // 恢复布局缓存（节点坐标 + 视图状态）
+  var savedLayout = d.layout || null;
+  if(savedLayout && savedLayout.nodePos){
+    nodePos = savedLayout.nodePos;
+    if(savedLayout.scale) scale = savedLayout.scale;
+    if(typeof savedLayout.tx === 'number') tx = savedLayout.tx;
+    if(typeof savedLayout.ty === 'number') ty = savedLayout.ty;
+    if(savedLayout.layout){ layout = savedLayout.layout; _switchLayoutUI(layout); }
+    log('已恢复布局缓存：' + Object.keys(nodePos).length + ' 个节点坐标', 'ok');
+  } else {
+    nodePos = {};
+  }
   _render();
   // 将手动链路 merge 回来（不重复）
   if(prevManualLinks.length > 0){
@@ -915,6 +928,25 @@ function buildTopo(dvs) {
 }
 function guessLinkType(p){ if(!p)return'1G Ethernet'; var l=p.toLowerCase(); if(l.indexOf('10ge')>=0||l.indexOf('te')>=0)return'10G Ethernet'; if(l.indexOf('lag')>=0||l.indexOf('po')>=0)return'LAG 聚合链路'; return'1G Ethernet'; }
 function guessSpeed(p){ if(!p)return'1Gbps'; var l=p.toLowerCase(); if(l.indexOf('100ge')>=0)return'100Gbps'; if(l.indexOf('tengig')>=0||l.indexOf('10ge')>=0)return'10Gbps'; if(l.indexOf('40g')>=0)return'40Gbps'; if(l.indexOf('25g')>=0)return'25Gbps'; return'1Gbps'; }
+
+// ═══ 布局自动保存 ═══
+var _layoutSaveTimer = null;
+function saveLayoutDebounced(){
+  if(_layoutSaveTimer) clearTimeout(_layoutSaveTimer);
+  _layoutSaveTimer = setTimeout(_doSaveLayout, 800);
+}
+function _doSaveLayout(){
+  fetch(API + '/layout/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodePos: nodePos, scale: scale, tx: tx, ty: ty, layout: layout })
+  }).catch(function(){});
+}
+// 同步布局模式 UI 按钮
+function _switchLayoutUI(ly){
+  var btns = document.querySelectorAll('[data-layout]');
+  btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-layout')===ly); });
+}
 
 // ═══ 统计 ═══
 function updateStats(){
@@ -1209,6 +1241,7 @@ function makeDrag(g, id){
   document.addEventListener('mouseup',function(){
     if(dragging&&dragNd===id){ dragging=false; dragNd=null;
       if(layout==='hier') updateNodeLayerByPosition(id);
+      saveLayoutDebounced();
     }
   });
 }
@@ -1273,12 +1306,13 @@ svgEl2.addEventListener('mousemove',function(e){
   tx=e.clientX-panSt.x; ty=e.clientY-panSt.y;
   applyTf();
 });
-svgEl2.addEventListener('mouseup',function(){ panSt=null; });
+svgEl2.addEventListener('mouseup',function(){ panSt=null; saveLayoutDebounced(); });
 svgEl2.addEventListener('mouseleave',function(){ panSt=null; });
 svgEl2.addEventListener('wheel',function(e){
   e.preventDefault();
   scale=Math.max(.2,Math.min(3, scale*(e.deltaY>0?.88:1.12)));
   applyTf();
+  saveLayoutDebounced();
 },{passive:false});
 function applyTf(){ document.getElementById('root').setAttribute('transform','translate('+tx+','+ty+') scale('+scale+')'); }
 function zoom(f){ scale=Math.max(.2,Math.min(3,scale*f)); applyTf(); }
@@ -1291,6 +1325,7 @@ function setLayout(ly, btn){
   ['lyAuto','lyHier','lyCircle'].forEach(function(id){ document.getElementById(id).className='btn-sm'; });
   if(btn) btn.className='btn-sm on';
   renderTopo();
+  saveLayoutDebounced();
 }
 function toggleLabel(){
   showLbl=!showLbl;
@@ -1516,6 +1551,7 @@ function _mergeTopology(backTopo){
 
   renderSidebar(); renderDevTable(); renderLinkTable(); updateStats(); renderTopo();
   document.getElementById('emptyTip').style.display = 'none';
+  saveLayoutDebounced();
 }
 
 // ═══ 链路编辑面板 ═══
@@ -1665,6 +1701,7 @@ function _mergeSingleLink(bl, srcLabel, tgtLabel){
   }
   renderTopo();
   updateStats();
+  saveLayoutDebounced();
 }
 
 // 链路面板列表渲染
@@ -1721,6 +1758,7 @@ function doRemoveLink(src, tgt){
     updateStats();
     log('已删除链路: ' + src + ' <-> ' + tgt, 'ok');
     showToast('🗑 链路已删除', 'up');
+    saveLayoutDebounced();
   }).catch(function(e){
     log('删除链路请求失败: ' + e.message, 'err');
   });
@@ -1759,6 +1797,7 @@ function doRemoveDevice(ip){
     renderSidebar(); renderDevTable(); renderLinkTable(); updateStats(); renderTopo();
     log('已删除设备 ' + (data.removed.label||ip) + ' (' + ip + ')，清理链路 ' + (data.linksRemoved||0) + ' 条', 'ok');
     showToast('🗑 已删除 ' + (data.removed.label||ip), 'up');
+    saveLayoutDebounced();
   }).catch(function(e){
     log('删除请求失败: ' + e.message, 'err');
   });
@@ -1965,6 +2004,85 @@ function exportSVG(){
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a'); a.href=url; a.download='topology.svg'; a.click();
   URL.revokeObjectURL(url);
+}
+
+// 导出完整拓扑 + 布局为 JSON
+function exportTopologyJSON(){
+  var data = {
+    version: '3.6.0',
+    exportedAt: new Date().toISOString(),
+    topology: topo,
+    layout: {
+      nodePos: nodePos,
+      scale: scale,
+      tx: tx,
+      ty: ty,
+      layout: layout
+    }
+  };
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'topology-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('拓扑已导出为 JSON', 'up');
+  log('导出拓扑 JSON：' + topo.nodes.length + ' 节点，' + topo.links.length + ' 链路', 'ok');
+}
+
+// 导入拓扑 JSON
+var _importInput = null;
+function importTopologyJSON(){
+  if(!_importInput){
+    _importInput = document.createElement('input');
+    _importInput.type = 'file';
+    _importInput.accept = '.json';
+    _importInput.style.display = 'none';
+    _importInput.addEventListener('change', function(e){
+      var file = e.target.files[0];
+      if(!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev){
+        try {
+          var data = JSON.parse(ev.target.result);
+          if(!data.topology || !data.topology.nodes){
+            log('导入失败：JSON 格式不正确，缺少 topology.nodes', 'err');
+            showToast('导入失败：格式不正确', 'up');
+            return;
+          }
+          var imp = data.topology;
+          topo = imp;
+          // 恢复布局
+          if(data.layout && data.layout.nodePos){
+            nodePos = data.layout.nodePos;
+            if(data.layout.scale) scale = data.layout.scale;
+            if(typeof data.layout.tx === 'number') tx = data.layout.tx;
+            if(typeof data.layout.ty === 'number') ty = data.layout.ty;
+            if(data.layout.layout){ layout = data.layout.layout; _switchLayoutUI(layout); }
+            applyTf();
+            log('已恢复导入布局：' + Object.keys(nodePos).length + ' 个节点坐标', 'ok');
+          } else {
+            nodePos = {};
+          }
+          _render();
+          showToast('拓扑已导入：' + topo.nodes.length + ' 节点', 'up');
+          log('导入拓扑 JSON：' + topo.nodes.length + ' 节点，' + topo.links.length + ' 链路', 'ok');
+          // 导入后保存到服务端缓存
+          saveLayoutDebounced();
+        } catch(err){
+          log('导入失败：' + err.message, 'err');
+          showToast('导入失败：JSON 解析错误', 'up');
+        }
+      };
+      reader.readAsText(file);
+      // 重置 value 允许重复导入同一文件
+      _importInput.value = '';
+    });
+    document.body.appendChild(_importInput);
+  }
+  _importInput.click();
 }
 
 // ═══ 页面切换 ═══
