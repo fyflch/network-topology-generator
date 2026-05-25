@@ -9,6 +9,7 @@ const express = require('express');
 const cors = require('cors');
 const { Client } = require('ssh2');
 const snmp = require('net-snmp');
+const ping = require('ping');
 const net = require('net');
 const os = require('os');
 const path = require('path');
@@ -34,6 +35,7 @@ app.use(express.static(path.join(__dirname, '../')));
 // ============================================================
 let scanStatus = { running: false, progress: 0, message: '' };
 let lastTopology = { nodes: [], links: [] };
+let lastScanCommunity = 'public'; // 记录最近一次扫描使用的 SNMP community
 
 // 拓扑缓存文件路径（与 server.js 同目录的 data/ 下）
 const CACHE_DIR = path.join(__dirname, 'data');
@@ -342,6 +344,42 @@ const CMDS = {
     hostname: 'show running-config | include hostname',
     iface:   'show interfaces',
     noPager: 'terminal length 0'
+  },
+  hikvision: {
+    // 海康威视交换机 CLI 兼容 Cisco 风格
+    version: 'show version',
+    lldp:    'show lldp neighbors',
+    lldpDetail: 'show lldp neighbors detail',
+    hostname: 'show running-config | include hostname',
+    iface:   'show interfaces status',
+    noPager: 'terminal length 0'
+  },
+  dahua: {
+    // 大华交换机 CLI 兼容 Cisco 风格
+    version: 'show version',
+    lldp:    'show lldp neighbors',
+    lldpDetail: 'show lldp neighbors detail',
+    hostname: 'show running-config | include hostname',
+    iface:   'show interfaces status',
+    noPager: 'terminal length 0'
+  },
+  tplink: {
+    // TP-Link JetStream CLI
+    version: 'show version',
+    lldp:    'show lldp neighbors',
+    lldpDetail: 'show lldp neighbors detail',
+    hostname: 'show running-config | include hostname',
+    iface:   'show interfaces status',
+    noPager: 'terminal length 0'
+  },
+  dell: {
+    // Dell OS6/OS10 CLI
+    version: 'show version',
+    lldp:    'show lldp neighbors',
+    lldpDetail: 'show lldp neighbors detail',
+    hostname: 'show running-config | include hostname',
+    iface:   'show interfaces status',
+    noPager: 'terminal length 0'
   }
 };
 
@@ -392,6 +430,64 @@ function parseVersion(output, vendor) {
     if (m) model = m[1];
     const v = output.match(/Version\s+([\d.]+)/i);
     if (v) version = 'ZTE ' + v[1];
+
+  } else if (vendor === 'hikvision') {
+    // 海康威视 sysDescr 示例:
+    // "Hikvision DS-3E0326P-EI Ethernet Switch, V5.4.102 Build 20230308"
+    // "Hikvision DS-3E0318P-E Hardware Version:V2.0 Software Version:V5.4.106"
+    const m = output.match(/(DS-[23][EC][\w-]+)/i);
+    if (m) model = m[1];
+    // 尝试多个版本格式
+    const v = output.match(/Software\s*Version\s*:\s*(V?[\d.]+)/i) ||
+              output.match(/Version\s*:\s*(V?[\d.]+)/i) ||
+              output.match(/,\s*V([\d.]+)/i) ||
+              output.match(/V([\d.]+)\s*Build/i);
+    if (v) version = 'V' + v[1].replace(/^V/i, '');
+
+  } else if (vendor === 'dahua') {
+    // 大华 sysDescr 示例:
+    // "Dahua DH-SW3018P-ET Hardware Version:1.0 Software Version:V2.1.0"
+    const m = output.match(/(DH-SW[\w-]+)/i) || output.match(/Dahua\s+([\w-]+)/i);
+    if (m) model = m[1];
+    const v = output.match(/Software\s*Version\s*:\s*(V?[\d.]+)/i) ||
+              output.match(/Version\s*:\s*(V?[\d.]+)/i);
+    if (v) version = 'V' + v[1].replace(/^V/i, '');
+
+  } else if (vendor === 'tplink') {
+    // TP-Link sysDescr 示例:
+    // "TP-LINK JetStream S3800-24T, Firmware Version: 2.0.0 Build 20230919"
+    // "TP-LINK TL-SG3428, Hardware Version:V3.0 Firmware Version:2.0.0"
+    const m = output.match(/(TL-S[GESL][\w-]+)/i) ||
+              output.match(/(S\d{4}[\w-]*)/i) ||
+              output.match(/TP-?Link\s+([\w-]+)/i);
+    if (m) model = m[1];
+    const v = output.match(/Firmware\s*Version\s*:\s*([\d.]+)/i) ||
+              output.match(/Version\s*:\s*([\d.]+)/i);
+    if (v) version = 'FW ' + v[1];
+
+  } else if (vendor === 'dell') {
+    // Dell sysDescr 示例:
+    // "Dell Networking OS6, Version 6.6.1.3"
+    // "Dell EMC Networking OS10, Version 10.5.1.1"
+    const m = output.match(/(PowerConnect\s+[\w-]+|N\d{4,}[\w-]*|S\d{4,}[\w-]*)/i) ||
+              output.match(/Dell\s+(?:EMC\s+)?Networking\s+([\w]+)/i);
+    if (m) model = m[1];
+    const v = output.match(/Version\s+([\d.]+)/i);
+    if (v) version = 'Dell ' + v[1];
+
+  } else {
+    // 通用解析：尝试从任何文本中提取型号和版本
+    // 匹配常见格式: "Brand ModelName, Version X.Y.Z"
+    const m = output.match(/^([A-Za-z][\w -]+?)\s+Version|^([A-Za-z][\w -]+?),/i);
+    if (m) model = (m[1] || m[2] || '').trim();
+    if (model === 'Unknown') {
+      // 尝试提取大写字母+数字组合的型号
+      const m2 = output.match(/\b([A-Z]{2,}[\w-]{3,})\b/);
+      if (m2) model = m2[1];
+    }
+    const v = output.match(/Version\s*[:=]?\s*([\d.]+\w*)/i) ||
+              output.match(/V([\d.]+[A-Za-z]*)/i);
+    if (v) version = v[1] || v[2] || version;
   }
 
   return { model, version };
@@ -544,7 +640,8 @@ function snmpGetSysInfo(host, community, timeout) {
     const oids = [
       '1.3.6.1.2.1.1.1.0',  // sysDescr
       '1.3.6.1.2.1.1.5.0',  // sysName
-      '1.3.6.1.2.1.1.4.0'   // sysContact
+      '1.3.6.1.2.1.1.4.0',  // sysContact
+      '1.3.6.1.2.1.1.2.0'   // sysObjectID（企业标识，辅助厂商识别）
     ];
     const session = snmp.createSession(host, community, {
       timeout, retries: 1, version: snmp.Version2c
@@ -562,11 +659,38 @@ function snmpGetSysInfo(host, community, timeout) {
       result.sysDescr   = toStr(varbinds[0]);
       result.sysName    = toStr(varbinds[1]);
       result.sysContact = toStr(varbinds[2]);
+      // sysObjectID: 完整 OID 形如 ".1.3.6.1.4.1.9.1.1"，取企业号部分 "1.3.6.1.4.1.xxxxx"
+      const oidRaw = toStr(varbinds[3]);
+      result.sysObjectID = oidRaw ? oidRaw.replace(/^\.+/, '').split('.').slice(0, 6).join('.') : '';
       // 至少有一个字段有值才算成功
       if (!result.sysDescr && !result.sysName) { resolve(null); return; }
       resolve(result);
     });
   });
+}
+
+// ============================================================
+// sysObjectID 企业号 → 厂商名 映射表（RFC+常见厂商）
+// ============================================================
+const VENDOR_OID_MAP = {
+  '1.3.6.1.4.1.9':    'cisco',       // Cisco Systems
+  '1.3.6.1.4.1.11':   'hp',           // Hewlett-Packard Enterprise
+  '1.3.6.1.4.1.25506': 'h3c',         // H3C / TP-Link (overlaps)
+  '1.3.6.1.4.1.2636': 'juniper',      // Juniper Networks
+  '1.3.6.1.4.1.119':  'huawei',       // Huawei Technologies
+  '1.3.6.1.4.1.4881': 'ruijie',       // Ruijie Networks
+  '1.3.6.1.4.1.3902': 'zte',          // ZTE Corporation
+  '1.3.6.1.4.1.5346': 'arista',       // Arista Networks
+  '1.3.6.1.4.1.39471':'hikvision',    // Hikvision Digital Technology
+  '1.3.6.1.4.1.4242': 'dell',         // Dell / Dell EMC
+};
+
+function detectVendorByOID(oid) {
+  if (!oid) return '';
+  for (const [prefix, vendor] of Object.entries(VENDOR_OID_MAP)) {
+    if (oid.startsWith(prefix)) return vendor;
+  }
+  return '';
 }
 
 // ============================================================
@@ -827,8 +951,11 @@ async function collectDevice(ip, sshPort, username, password, snmpCommunity) {
     try {
       device.snmp = await snmpGetSysInfo(ip, snmpCommunity, 4000);
       if (device.snmp) {
-        // SNMP 识别厂商（最准确）
-        const snmpVendor = detectVendor('', device.snmp.sysDescr || '');
+        // SNMP 识别厂商（优先 sysDescr 文本，sysObjectID 兜底）
+        let snmpVendor = detectVendor('', device.snmp.sysDescr || '');
+        if (snmpVendor === 'unknown' && device.snmp.sysObjectID) {
+          snmpVendor = detectVendorByOID(device.snmp.sysObjectID);
+        }
         if (snmpVendor !== 'unknown') device.vendor = snmpVendor;
         // SNMP hostname
         if (device.snmp.sysName && device.snmp.sysName.trim()) {
@@ -905,7 +1032,11 @@ async function collectDevice(ip, sshPort, username, password, snmpCommunity) {
 
   // ── 步骤 2：从 SSH 输出中重新识别厂商（可能比 SNMP 更精确）──
   if (sshOk) {
-    const sshVendor = detectVendor(shellOut, device.snmp ? device.snmp.sysDescr : '');
+    let sshVendor = detectVendor(shellOut, device.snmp ? device.snmp.sysDescr : '');
+    // SSH 也没识别出，用 sysObjectID 兜底
+    if (sshVendor === 'unknown' && device.snmp && device.snmp.sysObjectID) {
+      sshVendor = detectVendorByOID(device.snmp.sysObjectID);
+    }
     if (sshVendor !== 'unknown') device.vendor = sshVendor;
 
     // 解析版本/型号（SSH 输出 + SNMP 结合）
@@ -1065,6 +1196,12 @@ async function collectDevice(ip, sshPort, username, password, snmpCommunity) {
   }
 
   // ── 步骤 4：设置最终状态──
+  // 如果 vendor 还是 unknown，最后用 sysObjectID 兜底
+  if (device.vendor === 'unknown' && device.snmp && device.snmp.sysObjectID) {
+    const oidVendor = detectVendorByOID(device.snmp.sysObjectID);
+    if (oidVendor) device.vendor = oidVendor;
+  }
+
   // error：真实故障（设备SNMP不通 / LLDP全空）；sshWarn：SSH采集失败的提示（不影响在线状态）
   if (!sshOk) {
     const errShort = sshFailedReason ? sshFailedReason.substring(0, 80) : 'SSH连接失败';
@@ -1097,7 +1234,7 @@ function buildTopology(devices) {
       id: d.ip,
       label: d.hostname || d.ip,
       ip: d.ip,
-      vendor: d.vendor,
+      device_type: d.vendor,
       model: d.model,
       version: d.version,
       neighborCount: d.neighbors.length,
@@ -1146,6 +1283,95 @@ function buildTopology(devices) {
         speed: realSpeed || lt.speed
       });
     });
+  });
+
+  // ═══ BFS 拓扑分层（自动推断设备层级）══╗
+  // 构建邻接表
+  const adj = {};
+  nodes.forEach(n => { adj[n.ip] = []; });
+  links.forEach(l => {
+    if (adj[l.source]) adj[l.source].push(l.target);
+    if (adj[l.target]) adj[l.target].push(l.source);
+  });
+
+  // 找根节点候选（邻居数最多且 >= 3 的设备）
+  let rootIp = null;
+  let maxNeighbors = 0;
+  nodes.forEach(n => {
+    const cnt = adj[n.ip] ? adj[n.ip].length : 0;
+    if (cnt >= 3 && cnt > maxNeighbors) {
+      maxNeighbors = cnt;
+      rootIp = n.ip;
+    }
+  });
+  // 如果找不到合适的根，取邻居数最多的设备
+  if (!rootIp) {
+    nodes.forEach(n => {
+      const cnt = adj[n.ip] ? adj[n.ip].length : 0;
+      if (cnt > maxNeighbors) {
+        maxNeighbors = cnt;
+        rootIp = n.ip;
+      }
+    });
+  }
+
+  // BFS 分层
+  const ipToNode = {};
+  nodes.forEach(n => { ipToNode[n.ip] = n; });
+
+  const layerMap = {};  // ip -> layer number (0=core)
+  if (rootIp) {
+    const queue = [{ ip: rootIp, layer: 0 }];
+    const visited = new Set([rootIp]);
+    while (queue.length > 0) {
+      const { ip, layer } = queue.shift();
+      layerMap[ip] = layer;
+      (adj[ip] || []).forEach(nextIp => {
+        if (!visited.has(nextIp)) {
+          visited.add(nextIp);
+          queue.push({ ip: nextIp, layer: layer + 1 });
+        }
+      });
+    }
+  }
+
+  // 处理不在 BFS 树中的孤立节点（通过 links 匹配不到的）
+  nodes.forEach(n => {
+    if (layerMap[n.ip] === undefined) {
+      const cnt = adj[n.ip] ? adj[n.ip].length : 0;
+      if (cnt <= 1) {
+        layerMap[n.ip] = 3; // edge
+      } else if (cnt >= 3) {
+        layerMap[n.ip] = 0; // core
+      } else {
+        layerMap[n.ip] = 2; // access
+      }
+    }
+  });
+
+  // 确定实际层数，映射 layer -> role
+  const layerRoles = ['core', 'distribution', 'access', 'edge'];
+  let actualMaxLayer = 0;
+  nodes.forEach(n => {
+    const ly = layerMap[n.ip] !== undefined ? layerMap[n.ip] : 2;
+    if (ly > actualMaxLayer) actualMaxLayer = ly;
+  });
+
+  // 如果只有 1 层，全部标为 access
+  // 如果只有 2 层，用 core + access
+  // 3 层及以上，用 core + distribution + access (+ edge)
+  const effectiveRoles = actualMaxLayer === 0
+    ? ['access']
+    : actualMaxLayer === 1
+    ? ['core', 'access']
+    : ['core', 'distribution', 'access', 'edge'];
+
+  // 写入 role 和 layer
+  nodes.forEach(n => {
+    const ly = layerMap[n.ip] !== undefined ? layerMap[n.ip] : 2;
+    const roleIdx = Math.min(ly, effectiveRoles.length - 1);
+    n.role = effectiveRoles[roleIdx];
+    n.layer = ly;
   });
 
   return { nodes, links };
@@ -1223,6 +1449,25 @@ function tcpProbe(host, port, timeout) {
 // ============================================================
 // SNMP 快速探测（UDP，只取 sysDescr，用于判断主机是否响应 SNMP）
 // ============================================================
+// ICMP Ping 探测（用于周期性状态检测，替代 snmpProbe）
+// 无需 community、无 UDP 资源问题、并发无上限、支持手动添加的设备
+// ============================================================
+function pingProbe(host, timeoutSec) {
+  return ping.promise.probe(host, {
+    timeout: timeoutSec || 2,
+    packets: 1,
+    extra: ['-n', '1', '-w', String((timeoutSec || 2) * 1000)]
+  }).then(function(res) {
+    var ok = res.alive === true;
+    console.log('[pingProbe] ' + (ok ? 'OK' : 'FAIL') + ': ' + host + ' (' + (res.time || '?') + 'ms)');
+    return ok;
+  }).catch(function(e) {
+    console.log('[pingProbe] ERR: ' + host + ' ' + e.message);
+    return false;
+  });
+}
+
+// ============================================================
 function snmpProbe(host, community, timeout) {
   return new Promise((resolve) => {
     const SYS_DESCR = '1.3.6.1.2.1.1.1.0';
@@ -1237,7 +1482,7 @@ function snmpProbe(host, community, timeout) {
       resolve(false);
     }, to);
     try {
-      session = snmp.createSession(host, community, { timeout: to, retries: 0, version: snmp.Version2c });
+      session = snmp.createSession(host, community, { timeout: to, retries: 1, version: snmp.Version2c });
       session.get([SYS_DESCR], (err, vbs) => {
         if (done) return;
         done = true;
@@ -1252,6 +1497,9 @@ function snmpProbe(host, community, timeout) {
     }
   });
 }
+
+// 延迟辅助函数
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ============================================================
 // API 路由
@@ -1280,6 +1528,7 @@ app.post('/api/scan', async (req, res) => {
   if (!snmp_community) {
     return res.status(400).json({ error: 'SNMP Community 为必填项' });
   }
+  lastScanCommunity = snmp_community; // 保存供状态检测使用
 
   const ips = parseIpRange(ip_range);
   if (ips.length === 0) {
@@ -1401,6 +1650,139 @@ app.post('/api/cache-clear', (req, res) => {
   }
 });
 
+// 更新设备 role（手动调整层级后保存）
+app.post('/api/role-update', (req, res) => {
+  const { ip, role } = req.body;
+  if (!ip || !role) {
+    return res.status(400).json({ error: 'ip 和 role 为必填项' });
+  }
+  const validRoles = ['core', 'distribution', 'access', 'edge'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: 'role 必须是 core/distribution/access/edge 之一' });
+  }
+  if (!lastTopology || !lastTopology.nodes) {
+    return res.status(404).json({ error: '暂无拓扑数据，请先扫描' });
+  }
+  let found = false;
+  lastTopology.nodes.forEach(n => {
+    if (n.id === ip || n.ip === ip) {
+      n.role = role;
+      // 同步更新 layer
+      const layerMap = { core: 0, distribution: 1, access: 2, edge: 3 };
+      n.layer = layerMap[role] !== undefined ? layerMap[role] : 2;
+      found = true;
+    }
+  });
+  // 同时更新 allDevices 中的 role
+  if (lastTopology.allDevices) {
+    lastTopology.allDevices.forEach(d => {
+      if (d.ip === ip) {
+        d.role = role;
+      }
+    });
+  }
+  if (!found) {
+    return res.status(404).json({ error: '未找到 IP 对应的设备' });
+  }
+  saveCache(lastTopology);
+  res.json({ ok: true, ip, role });
+});
+
+// ============================================================
+// 设备在线状态检测 & 上下线历史
+// ============================================================
+
+// 状态历史文件
+const STATUS_HIST_FILE = path.join(CACHE_DIR, 'status-history.json');
+const MAX_STATUS_HISTORY = 500;
+
+let statusHistory = [];
+try {
+  if (fs.existsSync(STATUS_HIST_FILE)) {
+    statusHistory = JSON.parse(fs.readFileSync(STATUS_HIST_FILE, 'utf8')) || [];
+    console.log('[STATUS] 已加载状态历史：' + statusHistory.length + ' 条');
+  }
+} catch (e) { statusHistory = []; }
+
+function saveStatusHistory() {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    if (statusHistory.length > MAX_STATUS_HISTORY) {
+      statusHistory = statusHistory.slice(statusHistory.length - MAX_STATUS_HISTORY);
+    }
+    fs.writeFileSync(STATUS_HIST_FILE, JSON.stringify(statusHistory, null, 2), 'utf8');
+  } catch (e) {
+    console.log('[STATUS] 保存历史失败：' + e.message);
+  }
+}
+
+let prevDeviceStatus = {};
+
+// 设备在线检测（ICMP Ping，覆盖所有设备含手动添加的）
+app.get('/api/status-check', async (req, res) => {
+  if (!lastTopology || !lastTopology.nodes || lastTopology.nodes.length === 0) {
+    return res.json({ devices: {}, links: {}, changes: [], checkedAt: new Date().toISOString(), error: '暂无拓扑数据' });
+  }
+  const ips = lastTopology.nodes.map(n => n.ip).filter(Boolean);
+  if (ips.length === 0) {
+    return res.json({ devices: {}, links: {}, changes: [], checkedAt: new Date().toISOString() });
+  }
+  console.log('[STATUS] 开始 ICMP 检测 ' + ips.length + ' 台, IPs: ' + ips.slice(0, 5).join(',') + (ips.length > 5 ? '...' : ''));
+  // ICMP ping 并发检测（无需分批、无需 sleep、无 UDP 资源问题、无 community 依赖）
+  const results = await Promise.all(ips.map(ip =>
+    pingProbe(ip, 2).then(ok => {
+      console.log('[STATUS] ' + ip + ': ICMP=' + ok + ' -> ' + (ok ? 'ONLINE' : 'OFFLINE'));
+      return { ip, online: ok };
+    })
+  ));
+  const deviceStatus = {};
+  const changes = [];
+  const isFirstCheck = Object.keys(prevDeviceStatus).length === 0;
+  results.forEach(r => { deviceStatus[r.ip] = r.online ? 'online' : 'offline'; });
+  // 首次检测不对比变化（避免全量误报），直接建立基线
+  if (isFirstCheck) {
+    console.log('[STATUS] 首次检测，建立状态基线，跳过变化对比');
+  }
+  ips.forEach(ip => {
+    if (isFirstCheck) return; // 首次不产生变化记录
+    const prev = prevDeviceStatus[ip] || 'online';
+    const curr = deviceStatus[ip];
+    if (prev !== curr) {
+      const node = lastTopology.nodes.find(n => n.ip === ip);
+      const hostname = node ? (node.label || node.hostname || ip) : ip;
+      const record = { ip: ip, hostname: hostname, event: curr === 'offline' ? 'down' : 'up', prevStatus: prev, newStatus: curr, time: new Date().toISOString() };
+      changes.push(record);
+      statusHistory.push(record);
+      console.log('[STATUS] ' + (curr === 'offline' ? 'DOWN' : 'UP') + ': ' + hostname + ' (' + ip + ')');
+    }
+  });
+  if (changes.length > 0) saveStatusHistory();
+  prevDeviceStatus = deviceStatus;
+  const linkStatus = {};
+  (lastTopology.links || []).forEach((lk, i) => {
+    const srcOnline = deviceStatus[lk.source] === 'online';
+    const tgtOnline = deviceStatus[lk.target] === 'online';
+    linkStatus[i] = (srcOnline && tgtOnline) ? 'up' : 'down';
+  });
+  const onlineCount = results.filter(r => r.online).length;
+  const offlineCount = results.filter(r => !r.online).length;
+  console.log('[STATUS] 检测完成：在线 ' + onlineCount + '，离线 ' + offlineCount + (changes.length > 0 ? '，变化 ' + changes.length + ' 台' : ''));
+  res.json({ devices: deviceStatus, links: linkStatus, changes: changes, checkedAt: new Date().toISOString(), summary: { total: ips.length, online: onlineCount, offline: offlineCount } });
+});
+
+app.get('/api/status-history', (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  const records = statusHistory.slice(-limit).reverse();
+  res.json({ total: statusHistory.length, records: records });
+});
+
+app.post('/api/status-history/clear', (req, res) => {
+  statusHistory = [];
+  prevDeviceStatus = {};
+  try { if (fs.existsSync(STATUS_HIST_FILE)) fs.unlinkSync(STATUS_HIST_FILE); } catch (e) {}
+  res.json({ ok: true });
+});
+
 // 演示数据（用于测试）
 app.get('/api/topology/demo', (req, res) => {
   res.json({
@@ -1441,6 +1823,291 @@ app.post('/api/device/info', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ============================================================
+// 手动添加设备到拓扑（支持批量，不重新布局，保留现有节点坐标）
+// POST /api/device/add
+// body: { ips: ["1.2.3.4", "1.2.3.5"], community?: "public" }
+// ============================================================
+app.post('/api/device/add', async (req, res) => {
+  const { ips, community } = req.body || {};
+  if (!ips || !Array.isArray(ips) || ips.length === 0) {
+    return res.status(400).json({ error: 'ips 为必填项，格式为 IP 字符串数组' });
+  }
+
+  const useCommunity = (community && community.trim()) || lastScanCommunity || 'public';
+  const results = [];
+
+  for (const ip of ips) {
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip.trim())) {
+      results.push({ ip: ip.trim(), ok: false, error: 'IP 格式错误' });
+      continue;
+    }
+    const cleanIp = ip.trim();
+
+    // 检查是否已存在
+    const existing = lastTopology.nodes.find(n => n.ip === cleanIp);
+    if (existing) {
+      results.push({ ip: cleanIp, ok: false, error: '设备已在拓扑中 (' + (existing.label || existing.hostname || cleanIp) + ')' });
+      continue;
+    }
+
+    console.log('[ADD] 探测设备 ' + cleanIp + ' (community=' + useCommunity + ')');
+
+    // 新节点基础结构
+    let newNode = {
+      id: cleanIp,
+      ip: cleanIp,
+      label: cleanIp,
+      hostname: cleanIp,
+      vendor: 'unknown',
+      device_type: 'unknown',
+      model: 'Unknown',
+      version: 'Unknown',
+      role: 'access',
+      layer: 2,
+      neighborCount: 0,
+      manualAdded: true
+    };
+
+    // SNMP 探测基础信息
+    try {
+      const sysInfo = await snmpGetSysInfo(cleanIp, useCommunity, 4000);
+      if (sysInfo) {
+        let vendor = detectVendor('', sysInfo.sysDescr || '');
+        if (vendor === 'unknown' && sysInfo.sysObjectID) {
+          vendor = detectVendorByOID(sysInfo.sysObjectID);
+        }
+        if (vendor !== 'unknown') newNode.vendor = vendor;
+        newNode.device_type = newNode.vendor;
+        if (sysInfo.sysName && sysInfo.sysName.trim()) {
+          newNode.hostname = sysInfo.sysName.trim();
+          newNode.label = sysInfo.sysName.trim();
+        }
+        if (sysInfo.sysDescr) {
+          const parsed = parseVersion(sysInfo.sysDescr, newNode.vendor);
+          if (parsed.model !== 'Unknown') newNode.model = parsed.model;
+          if (parsed.version !== 'Unknown') newNode.version = parsed.version;
+        }
+        console.log('[ADD] SNMP OK: ' + cleanIp + ' -> ' + newNode.label + ' (' + newNode.vendor + ')');
+      }
+    } catch (e) {
+      console.log('[ADD] SNMP 探测失败 ' + cleanIp + ': ' + e.message);
+    }
+
+    // LLDP 邻居探测 -> 自动发现与现有节点的连接
+    const newLinks = [];
+    try {
+      const ifResult = await snmpGetIfSpeedMap(cleanIp, useCommunity, 5000).catch(() => ({ speedMap: {}, ifDescrByName: {} }));
+      const speedMap = ifResult.speedMap || {};
+      const ifDescrByName = ifResult.ifDescrByName || {};
+      const neighbors = await snmpGetLLDPNeighbors(cleanIp, useCommunity, 5000);
+      if (neighbors && neighbors.length > 0) {
+        newNode.neighborCount = neighbors.length;
+        console.log('[ADD] LLDP 邻居数: ' + neighbors.length);
+        for (const nb of neighbors) {
+          const remIp = nb.remote_mgmt;
+          if (!remIp) continue;
+          const existNode = lastTopology.nodes.find(n => n.ip === remIp);
+          if (!existNode) continue;
+          // 解析速率
+          const localIfIdx = ifDescrByName[nb.local_port];
+          const speedBps = localIfIdx ? speedMap[localIfIdx] : undefined;
+          let speed = 'Unknown';
+          if (speedBps) {
+            if (speedBps >= 10e9) speed = '10Gbps';
+            else if (speedBps >= 1e9) speed = '1Gbps';
+            else if (speedBps >= 100e6) speed = '100Mbps';
+            else speed = Math.round(speedBps / 1e6) + 'Mbps';
+          }
+          // 去重（用排序后的 IP 对）
+          const linkKey = [cleanIp, remIp].sort().join('||');
+          const alreadyExists = lastTopology.links.find(l => [l.source, l.target].sort().join('||') === linkKey)
+            || newLinks.find(l => [l.source, l.target].sort().join('||') === linkKey);
+          if (!alreadyExists) {
+            newLinks.push({
+              source: cleanIp,
+              target: remIp,
+              source_port: nb.local_port || '',
+              target_port: nb.remote_port || '',
+              link_type: guessLinkType(nb.local_port),
+              speed: speed
+            });
+            console.log('[ADD] 发现链路: ' + cleanIp + ' <-> ' + remIp + ' ' + speed);
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[ADD] LLDP 探测失败 ' + cleanIp + ': ' + e.message);
+    }
+
+    // 根据邻居数推断 role
+    if (newNode.neighborCount >= 4) newNode.role = 'core';
+    else if (newNode.neighborCount >= 2) newNode.role = 'distribution';
+    else newNode.role = 'access';
+
+    // 追加到拓扑（不修改现有节点坐标）
+    lastTopology.nodes.push(newNode);
+    lastTopology.links.push(...newLinks);
+    saveCache(lastTopology);
+
+    results.push({ ip: cleanIp, ok: true, node: newNode, linksAdded: newLinks.length, links: newLinks });
+    console.log('[ADD] 完成: ' + cleanIp + ' (' + newNode.label + ')，新链路: ' + newLinks.length);
+  }
+
+  res.json({ results: results, topology: lastTopology });
+});
+
+// ============================================================
+// 删除单台设备（同时删除相关链路）
+// DELETE /api/device/remove
+// body: { ip: "1.2.3.4" }
+// ============================================================
+app.delete('/api/device/remove', (req, res) => {
+  const { ip } = req.body || {};
+  if (!ip) {
+    return res.status(400).json({ error: 'ip 为必填项' });
+  }
+
+  const nodeIdx = lastTopology.nodes.findIndex(n => n.ip === ip || n.id === ip || n.label === ip);
+  if (nodeIdx === -1) {
+    return res.status(404).json({ error: '设备不在拓扑中: ' + ip });
+  }
+
+  const node = lastTopology.nodes[nodeIdx];
+  const nodeId = node.id || node.label || node.ip;
+  const nodeIp = node.ip;
+  const linkBefore = (lastTopology.links || []).length;
+
+  // 删除节点
+  lastTopology.nodes.splice(nodeIdx, 1);
+
+  // 删除相关链路（source 或 target 匹配）
+  lastTopology.links = (lastTopology.links || []).filter(l => {
+    return l.source !== nodeIp && l.source !== nodeId
+        && l.target !== nodeIp && l.target !== nodeId;
+  });
+
+  const linksRemoved = linkBefore - lastTopology.links.length;
+  saveCache(lastTopology);
+  console.log('[REMOVE] 删除: ' + nodeId + ' (' + nodeIp + ')，清理链路 ' + linksRemoved + ' 条');
+
+  res.json({
+    ok: true,
+    removed: { ip: nodeIp, label: nodeId },
+    linksRemoved: linksRemoved,
+    topology: lastTopology
+  });
+});
+
+// ============================================================
+// 手动添加链路
+// POST /api/link/add
+// body: { source, target, source_port, target_port, link_type, speed }
+// source/target 可以是 IP 或 hostname/label
+// ============================================================
+app.post('/api/link/add', (req, res) => {
+  const { source, target, source_port, target_port, link_type, speed } = req.body || {};
+  if (!source || !target) {
+    return res.status(400).json({ error: 'source 和 target 为必填项' });
+  }
+
+  // 查找源节点和目标节点（支持 IP 或 label/hostname 匹配）
+  const findNode = (val) => lastTopology.nodes.find(n =>
+    n.ip === val || n.id === val || n.label === val || n.hostname === val
+  );
+
+  const srcNode = findNode(source);
+  const tgtNode = findNode(target);
+
+  if (!srcNode) {
+    return res.status(404).json({ error: '找不到源设备: ' + source });
+  }
+  if (!tgtNode) {
+    return res.status(404).json({ error: '找不到目标设备: ' + target });
+  }
+
+  const srcIp = srcNode.ip;
+  const tgtIp = tgtNode.ip;
+
+  // 检查链路是否已存在（用排序 IP 对去重）
+  const key = [srcIp, tgtIp].sort().join('||');
+  const exists = (lastTopology.links || []).some(l => {
+    const ln = findNode(l.source), lt = findNode(l.target);
+    const lSrcIp = ln ? ln.ip : l.source;
+    const lTgtIp = lt ? lt.ip : l.target;
+    return [lSrcIp, lTgtIp].sort().join('||') === key;
+  });
+  if (exists) {
+    return res.status(409).json({ error: '该链路已存在（两设备间已有连接）' });
+  }
+
+  const newLink = {
+    source: srcIp,
+    target: tgtIp,
+    source_port: source_port || '',
+    target_port: target_port || '',
+    link_type: link_type || '1G Ethernet',
+    speed: speed || '1Gbps',
+    manual: true
+  };
+
+  if (!lastTopology.links) lastTopology.links = [];
+  lastTopology.links.push(newLink);
+  saveCache(lastTopology);
+
+  console.log('[LINK/ADD] 手动添加链路: ' + srcNode.label + ' <-> ' + tgtNode.label + ' (' + (source_port||'?') + ' / ' + (target_port||'?') + ')');
+
+  res.json({
+    ok: true,
+    link: newLink,
+    srcLabel: srcNode.label || srcNode.id || srcIp,
+    tgtLabel: tgtNode.label || tgtNode.id || tgtIp,
+    topology: lastTopology
+  });
+});
+
+// ============================================================
+// 手动删除链路
+// DELETE /api/link/remove
+// body: { source, target }  (IP 或 hostname/label，顺序不限)
+// ============================================================
+app.delete('/api/link/remove', (req, res) => {
+  const { source, target } = req.body || {};
+  if (!source || !target) {
+    return res.status(400).json({ error: 'source 和 target 为必填项' });
+  }
+
+  const findNode = (val) => lastTopology.nodes.find(n =>
+    n.ip === val || n.id === val || n.label === val || n.hostname === val
+  );
+
+  const srcNode = findNode(source);
+  const tgtNode = findNode(target);
+
+  // 支持通过 IP 或节点名匹配
+  const srcIp = srcNode ? srcNode.ip : source;
+  const tgtIp = tgtNode ? tgtNode.ip : target;
+  const key = [srcIp, tgtIp].sort().join('||');
+
+  const before = (lastTopology.links || []).length;
+  lastTopology.links = (lastTopology.links || []).filter(l => {
+    const ln = findNode(l.source), lt = findNode(l.target);
+    const lSrcIp = ln ? ln.ip : l.source;
+    const lTgtIp = lt ? lt.ip : l.target;
+    return [lSrcIp, lTgtIp].sort().join('||') !== key;
+  });
+
+  const removed = before - lastTopology.links.length;
+  if (removed === 0) {
+    return res.status(404).json({ error: '未找到该链路' });
+  }
+
+  saveCache(lastTopology);
+  console.log('[LINK/REMOVE] 删除链路: ' + source + ' <-> ' + target);
+
+  res.json({ ok: true, removed: removed, topology: lastTopology });
 });
 
 // ============================================================

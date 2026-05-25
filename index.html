@@ -153,9 +153,239 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
 /* spinner */
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; animation: rot .6s linear infinite; }
 @keyframes rot { to { transform: rotate(360deg); } }
+
+/* Toast */
+.toast-wrap { position: fixed; top: 60px; right: 16px; z-index: 999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { padding: 10px 16px; border-radius: 8px; font-size: 13px; color: #e6edf3; pointer-events: auto; animation: toastIn .3s ease; box-shadow: 0 4px 16px rgba(0,0,0,.5); max-width: 340px; }
+.toast-down { background: #3d1214; border: 1px solid #f85149; }
+.toast-up { background: #122117; border: 1px solid #3fb950; }
+@keyframes toastIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+
+/* 监测面板 */
+.mon-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: 10px 14px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.mon-bar .fg { margin-bottom: 0; }
+.mon-bar .fg label { margin-bottom: 0; }
+.mon-bar select { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 5px 8px; border-radius: 5px; font-size: 12px; outline: none; }
+.mon-bar select:focus { border-color: #388bfd; }
+.mon-summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; padding: 14px; border-bottom: 1px solid #30363d; }
+.mon-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px; text-align: center; }
+.mon-val { font-size: 28px; font-weight: 700; }
+.mon-lbl { font-size: 11px; color: #8b949e; margin-top: 4px; }
+.mon-time { font-size: 11px; color: #8b949e; padding: 6px 14px; border-bottom: 1px solid #30363d; }
+.timeline { padding: 14px; }
+.timeline-empty { text-align: center; padding: 40px; color: #8b949e; }
+.tl-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,.4); font-size: 12px; }
+.tl-icon { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.tl-icon.down { background: #f85149; }
+.tl-icon.up { background: #3fb950; }
+.tl-body { flex: 1; }
+.tl-host { font-weight: 600; color: #e6edf3; }
+.tl-ip { color: #8b949e; font-family: Consolas, monospace; font-size: 11px; }
+.tl-event { font-size: 11px; margin-top: 2px; }
+.tl-time { color: #8b949e; font-size: 11px; flex-shrink: 0; }
+
+/* ── 添加设备面板 ── */
+.add-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100vh; background: #161b22; border-left: 1px solid #30363d; z-index: 800; display: flex; flex-direction: column; transition: right .25s ease; box-shadow: -6px 0 24px rgba(0,0,0,.4); }
+.add-panel.open { right: 0; }
+.add-panel-hd { padding: 14px 16px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.add-panel-hd h3 { font-size: 14px; font-weight: 600; color: #e6edf3; }
+.add-panel-bd { flex: 1; overflow-y: auto; padding: 16px; }
+.add-panel-bd::-webkit-scrollbar { width: 4px; }
+.add-panel-bd::-webkit-scrollbar-thumb { background: #30363d; }
+.add-panel textarea { width: 100%; box-sizing: border-box; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 10px; font-size: 12px; font-family: Consolas,monospace; resize: vertical; outline: none; min-height: 100px; }
+.add-panel textarea:focus { border-color: #388bfd; }
+.add-panel .fp-label { font-size: 12px; color: #8b949e; margin-bottom: 6px; display: block; }
+.add-panel .fp-row { margin-bottom: 14px; }
+.add-panel input[type=text] { width: 100%; box-sizing: border-box; background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 7px 10px; border-radius: 6px; font-size: 12px; outline: none; }
+.add-panel input[type=text]:focus { border-color: #388bfd; }
+.add-result { margin-top: 14px; }
+.add-result-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; }
+.add-result-item.ok  { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); color: #3fb950; }
+.add-result-item.err { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); color: #f85149; }
+.add-result-item .res-ip { font-family: Consolas,monospace; font-weight: 600; }
+.add-result-item .res-detail { color: #8b949e; font-size: 11px; margin-top: 2px; }
+.add-hint { color: #8b949e; font-size: 11px; line-height: 1.6; margin-bottom: 12px; }
+.btn-sm-danger { background: none; border: 1px solid #f85149; color: #f85149; padding: 2px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+.btn-sm-danger:hover { background: rgba(248,81,73,.15); }
+
+/* ── 链路编辑面板 ── */
+.link-panel { position: fixed; top: 0; right: -460px; width: 440px; height: 100vh; background: #161b22; border-left: 1px solid #30363d; z-index: 800; display: flex; flex-direction: column; transition: right .25s ease; box-shadow: -6px 0 24px rgba(0,0,0,.4); }
+.link-panel.open { right: 0; }
+.link-panel-hd { padding: 14px 16px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.link-panel-hd h3 { font-size: 14px; font-weight: 600; color: #e6edf3; }
+.link-panel-bd { flex: 1; overflow-y: auto; padding: 16px; }
+.link-panel-bd::-webkit-scrollbar { width: 4px; }
+.link-panel-bd::-webkit-scrollbar-thumb { background: #30363d; }
+
+/* 编辑模式画布 */
+#svg.link-edit-mode { cursor: crosshair; }
+#svg.link-edit-mode g[data-nd] rect { cursor: pointer; }
+.edit-mode-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(31,111,235,.9); color: #fff; padding: 6px 18px; border-radius: 20px; font-size: 12px; pointer-events: none; z-index: 50; white-space: nowrap; }
+
+/* 节点选中高亮（链路编辑模式） */
+.lk-src-hl { filter: drop-shadow(0 0 6px #3fb950); }
+.lk-tgt-hl { filter: drop-shadow(0 0 6px #388bfd); }
+
+/* 链路列表 */
+.lk-list-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 6px; font-size: 12px; }
+.lk-list-item:hover { border-color: #388bfd; }
+.lk-list-item .lk-info { flex: 1; }
+.lk-list-item .lk-devices { font-weight: 600; color: #e6edf3; margin-bottom: 2px; }
+.lk-list-item .lk-ports { color: #8b949e; font-size: 11px; font-family: Consolas,monospace; }
+.lk-list-item .lk-type { font-size: 11px; }
+.lk-manual-badge { display: inline-block; background: rgba(188,140,255,.15); color: #bc8cff; border: 1px solid rgba(188,140,255,.3); padding: 1px 6px; border-radius: 3px; font-size: 10px; margin-left: 4px; }
+
+/* 链路选择弹窗 */
+.lk-modal-mask { display: none; position: fixed; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,.5); z-index: 900; align-items: center; justify-content: center; }
+.lk-modal-mask.show { display: flex; }
+.lk-modal { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; width: 380px; max-width: 95vw; }
+.lk-modal h4 { font-size: 14px; font-weight: 600; margin-bottom: 16px; color: #e6edf3; }
+.lk-modal .fm-row { margin-bottom: 12px; }
+.lk-modal .fm-label { font-size: 11px; color: #8b949e; margin-bottom: 4px; display: block; }
+.lk-modal select, .lk-modal input[type=text] { width: 100%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 7px 9px; border-radius: 6px; font-size: 12px; outline: none; }
+.lk-modal select:focus, .lk-modal input[type=text]:focus { border-color: #388bfd; }
+.lk-modal .fm-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lk-modal-footer { display: flex; gap: 8px; margin-top: 18px; }
+.lk-modal-footer button { flex: 1; padding: 9px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; }
+.lk-confirm-btn { background: #1f6feb; color: #fff; }
+.lk-confirm-btn:hover { background: #388bfd; }
+.lk-cancel-btn { background: #21262d; color: #8b949e; border: 1px solid #30363d !important; }
+.lk-cancel-btn:hover { color: #e6edf3; }
 </style>
 </head>
 <body>
+
+<!-- Toast 通知 -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ══ 添加设备面板（右侧滑出） ══ -->
+<div class="add-panel" id="addPanel">
+  <div class="add-panel-hd">
+    <h3>➕ 添加设备到拓扑</h3>
+    <button class="det-close" onclick="closeAddPanel()">×</button>
+  </div>
+  <div class="add-panel-bd">
+    <div class="add-hint">
+      支持批量添加，每行一个 IP。<br>
+      系统将自动通过 SNMP 探测设备信息，<br>
+      并自动发现与现有设备的 LLDP 链路关系。<br>
+      <strong style="color:#d29922">⚠ 添加后不会重新布局，现有节点位置不变。</strong>
+    </div>
+    <div class="fp-row">
+      <label class="fp-label">IP 地址（每行一个）</label>
+      <textarea id="addIpInput" placeholder="192.168.1.10&#10;192.168.1.11&#10;192.168.1.12"></textarea>
+    </div>
+    <div class="fp-row">
+      <label class="fp-label">SNMP Community（留空使用上次扫描值）</label>
+      <input type="text" id="addCommunity" placeholder="留空使用上次扫描的 community">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1;padding:8px" id="addBtn" onclick="doAddDevices()">
+        <span id="addSpin" class="spin" style="display:none;margin-right:6px"></span>
+        <span id="addTxt">开始探测并添加</span>
+      </button>
+      <button class="btn" style="padding:8px 14px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:6px;cursor:pointer" onclick="closeAddPanel()">取消</button>
+    </div>
+    <div class="add-result" id="addResult"></div>
+  </div>
+</div>
+<div id="addOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:799;background:rgba(0,0,0,.3)" onclick="closeAddPanel()"></div>
+
+<!-- ══ 链路编辑面板（右侧滑出） ══ -->
+<div class="link-panel" id="linkPanel">
+  <div class="link-panel-hd">
+    <h3>✏️ 链路管理</h3>
+    <button class="det-close" onclick="closeLinkPanel()">×</button>
+  </div>
+  <div class="link-panel-bd">
+    <!-- 新增链路区 -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:12px;font-weight:600;color:#e6edf3;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        <span style="color:#3fb950">⊕</span> 手动添加链路
+      </div>
+      <div style="font-size:11px;color:#8b949e;line-height:1.6;margin-bottom:12px;background:#0d1117;border-radius:6px;padding:8px">
+        从拓扑中<strong style="color:#3fb950">点击第一个节点</strong>（上联）→ 再<strong style="color:#388bfd">点击第二个节点</strong>（下联），系统自动填入设备。<br>
+        也可在下方直接选择设备。
+      </div>
+      <div class="fm-row" style="margin-bottom:10px">
+        <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">上联设备（已存在于拓扑）</label>
+        <div style="display:flex;gap:6px">
+          <select id="lkSrcSel" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 9px;border-radius:6px;font-size:12px;outline:none">
+            <option value="">-- 点击拓扑节点或在此选择 --</option>
+          </select>
+          <button id="lkSrcPickBtn" class="btn-sm" onclick="startPickNode('src')" title="点击后在拓扑图中选择节点" style="white-space:nowrap;padding:4px 8px">选择</button>
+        </div>
+      </div>
+      <div class="fm-row" style="margin-bottom:10px">
+        <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">上联端口 <small style="opacity:.6">（可空）</small></label>
+        <input type="text" id="lkSrcPort" placeholder="如: GigabitEthernet0/10 或 Gi0/10" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 9px;border-radius:6px;font-size:12px;outline:none">
+      </div>
+      <div class="fm-row" style="margin-bottom:10px">
+        <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">下联设备</label>
+        <div style="display:flex;gap:6px">
+          <select id="lkTgtSel" style="flex:1;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 9px;border-radius:6px;font-size:12px;outline:none">
+            <option value="">-- 点击拓扑节点或在此选择 --</option>
+          </select>
+          <button id="lkTgtPickBtn" class="btn-sm" onclick="startPickNode('tgt')" title="点击后在拓扑图中选择节点" style="white-space:nowrap;padding:4px 8px">选择</button>
+        </div>
+      </div>
+      <div class="fm-row" style="margin-bottom:10px">
+        <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">下联端口 <small style="opacity:.6">（可空）</small></label>
+        <input type="text" id="lkTgtPort" placeholder="如: eth0 或 GE1/0/1" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 9px;border-radius:6px;font-size:12px;outline:none">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div>
+          <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">链路类型</label>
+          <select id="lkTypeSel" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 6px;border-radius:6px;font-size:12px;outline:none">
+            <option value="1G Ethernet">1G 以太网</option>
+            <option value="10G Ethernet">10G 以太网</option>
+            <option value="25G Ethernet">25G 以太网</option>
+            <option value="40G Ethernet">40G 以太网</option>
+            <option value="100G Ethernet">100G 以太网</option>
+            <option value="LAG 聚合链路">LAG 聚合链路</option>
+          </select>
+        </div>
+        <div>
+          <label class="fp-label" style="font-size:11px;color:#8b949e;margin-bottom:4px;display:block">速率</label>
+          <select id="lkSpeedSel" style="width:100%;background:#21262d;border:1px solid #30363d;color:#e6edf3;padding:7px 6px;border-radius:6px;font-size:12px;outline:none">
+            <option value="100Mbps">100Mbps</option>
+            <option value="1Gbps" selected>1Gbps</option>
+            <option value="10Gbps">10Gbps</option>
+            <option value="25Gbps">25Gbps</option>
+            <option value="40Gbps">40Gbps</option>
+            <option value="100Gbps">100Gbps</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="lkAddBtn" onclick="doAddLink()" style="width:100%;padding:9px">
+        <span id="lkAddSpin" class="spin" style="display:none;margin-right:6px"></span>
+        <span id="lkAddTxt">确认添加链路</span>
+      </button>
+      <div id="lkAddResult" style="margin-top:10px"></div>
+    </div>
+
+    <!-- 现有手动链路列表 -->
+    <div style="border-top:1px solid #30363d;padding-top:16px">
+      <div style="font-size:12px;font-weight:600;color:#e6edf3;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between">
+        <span>📋 现有链路</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:11px;color:#8b949e;display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="lkShowManualOnly" onchange="renderLinkPanelList()" style="cursor:pointer"> 仅手动
+          </label>
+          <span class="cnt" id="lkListCnt">0</span>
+        </div>
+      </div>
+      <div id="lkPanelList"></div>
+    </div>
+  </div>
+</div>
+<div id="linkOverlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:799;background:rgba(0,0,0,.15)" onclick="closeLinkPanel()"></div>
+
+<!-- ══ 拾取节点提示条 ══ -->
+<div class="edit-mode-banner" id="pickBanner" style="display:none">
+  点击拓扑图中的节点进行选择 &nbsp;|&nbsp; <span id="pickWhich" style="font-weight:600"></span>
+  <span style="margin-left:8px;opacity:.7;cursor:pointer" onclick="cancelPickNode()">✕ 取消</span>
+</div>
 
 <!-- 顶部导航 -->
 <div class="topbar">
@@ -167,6 +397,7 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
     <button class="nav-tab active" onclick="gotoPage('topo',this)">🗺 拓扑视图</button>
     <button class="nav-tab" onclick="gotoPage('devices',this)">📋 设备列表</button>
     <button class="nav-tab" onclick="gotoPage('links',this)">🔗 链路管理</button>
+    <button class="nav-tab" onclick="gotoPage('monitor',this)">📡 状态监测</button>
   </div>
   <div class="topbar-right">
     <span class="status-dot" id="sDot"></span>
@@ -229,11 +460,14 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
         <div class="t-group">
           <button class="btn-sm" id="lblBtn" onclick="toggleLabel()">🏷 标签</button>
           <button class="btn-sm" onclick="exportSVG()">💾 导出</button>
+          <button class="btn-sm" onclick="openAddPanel()" style="border-color:#3fb950;color:#3fb950">➕ 添加设备</button>
+          <button class="btn-sm" id="lkEditBtn" onclick="openLinkPanel()" style="border-color:#bc8cff;color:#bc8cff">✏️ 链路编辑</button>
         </div>
         <div class="legend">
           <span><span class="leg-line" style="background:#3fb950;height:3px"></span>10G</span>
           <span><span class="leg-line" style="background:#388bfd"></span>1G</span>
           <span><span class="leg-line" style="background:#bc8cff;border-top:2px dashed #bc8cff;height:0"></span>LAG</span>
+          <span><span class="leg-line" style="background:#bc8cff;border-top:2px dashed #bc8cff;height:0;border-style:dotted"></span>手动</span>
         </div>
       </div>
       <div class="canvas" id="cvs">
@@ -288,11 +522,45 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
   <!-- ══ 链路管理页 ══ -->
   <div class="page lst-page" id="page-links">
     <div class="tbl-wrap">
-      <h3 style="margin-bottom:14px;font-size:15px">🔗 链路明细</h3>
+      <h3 style="margin-bottom:14px;font-size:15px">🔗 链路明细
+        <button class="btn-sm" onclick="openLinkPanel()" style="margin-left:12px;border-color:#bc8cff;color:#bc8cff;font-size:11px">✏️ 编辑链路</button>
+      </h3>
       <table class="dtbl">
-        <thead><tr><th>源设备</th><th>源端口</th><th>目标设备</th><th>目标端口</th><th>链路类型</th><th>速率</th></tr></thead>
-        <tbody id="lkTblBody"><tr><td colspan="6" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr></tbody>
+        <thead><tr><th>源设备</th><th>源端口</th><th>目标设备</th><th>目标端口</th><th>链路类型</th><th>速率</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="lkTblBody"><tr><td colspan="7" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ══ 状态监测页 ══ -->
+  <div class="page lst-page" id="page-monitor">
+    <div class="mon-bar">
+      <div class="fg">
+        <label>轮询间隔</label>
+        <select id="monInterval" onchange="setMonitorInterval(this.value)">
+          <option value="0">关闭</option>
+          <option value="60">1 分钟</option>
+          <option value="120" selected>2 分钟</option>
+          <option value="180">3 分钟</option>
+          <option value="300">5 分钟</option>
+          <option value="600">10 分钟</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="width:auto;padding:6px 16px" onclick="doStatusCheck()">
+        <span class="spin" id="monSpin" style="display:none"></span>
+        <span id="monBtnTxt">立即检测</span>
+      </button>
+      <div style="margin-left:auto;font-size:12px;color:#8b949e" id="monNextTime"></div>
+    </div>
+    <div class="mon-summary" id="monSummary">
+      <div class="mon-card"><div class="mon-val" id="monTotal" style="color:#e6edf3">-</div><div class="mon-lbl">总设备</div></div>
+      <div class="mon-card"><div class="mon-val" id="monOnline" style="color:#3fb950">-</div><div class="mon-lbl">在线</div></div>
+      <div class="mon-card"><div class="mon-val" id="monOffline" style="color:#f85149">-</div><div class="mon-lbl">离线</div></div>
+      <div class="mon-card"><div class="mon-val" id="monLinks" style="color:#388bfd">-</div><div class="mon-lbl">链路异常</div></div>
+    </div>
+    <div class="mon-time" id="monLastCheck">尚未执行检测</div>
+    <div class="timeline" id="monTimeline">
+      <div class="timeline-empty">暂无上下线历史记录<br><span style="font-size:11px;opacity:.7">开启轮询后自动记录</span></div>
     </div>
   </div>
 
@@ -357,54 +625,7 @@ var scale = 1, tx = 0, ty = 0;
 var nodePos = {};
 var panSt = null, dragNd = null, dragOx = 0, dragOy = 0, dragSx = 0, dragSy = 0;
 
-var NW = 104, NH = 58; // 默认值（接入层），核心层动态放大
-
-// 设备类型图标 SVG path（24×24 viewBox）
-var DEVICE_ICONS = {
-  switch_core: '<path d="M2 8h20v8H2z M2 10h20v4H2z M2 12h20v2H2z" fill="currentColor"/>'
-    + '<path d="M6 4v4M10 4v4M14 4v4M18 4v4" stroke="currentColor" stroke-width="1.5" fill="none"/>'
-    + '<path d="M6 20v-4M10 20v-4M14 20v-4M18 20v-4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
-  switch: '<rect x="3" y="7" width="18" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M7 4v3M12 4v3M17 4v3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
-    + '<path d="M7 17v3M12 17v3M17 17v3" stroke="currentColor" stroke-width="1.5" fill="none"/>'
-    + '<circle cx="7" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="17" cy="12" r="1.2" fill="currentColor"/>',
-  router: '<circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M7 12h4M13 12h4M11 9v6M13 9v6" stroke="currentColor" stroke-width="1.5"/>',
-  firewall: '<path d="M12 2L4 7v10l8 5 8-5V7z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M9 10h6v4H9z" fill="currentColor" opacity="0.5"/>',
-  wireless: '<circle cx="12" cy="16" r="2" fill="currentColor"/>'
-    + '<path d="M6 12a8 8 0 0 1 12 0" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M9 8a6 6 0 0 1 6 0" fill="none" stroke="currentColor" stroke-width="1.5"/>',
-  camera: '<rect x="3" y="6" width="14" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M17 9l4-2v10l-4-2z" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<circle cx="10" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/>',
-  generic: '<rect x="4" y="4" width="16" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/>'
-    + '<path d="M8 9h8M8 12h8M8 15h5" stroke="currentColor" stroke-width="1.2"/>'
-};
-
-// 根据设备角色和类型选择图标
-function getDeviceIcon(nd) {
-  var t = (nd.device_type || '').toLowerCase();
-  var r = nd.role || 'access';
-  // 监控设备
-  if (t === 'hikvision' || t === 'dahua') return DEVICE_ICONS.camera;
-  // 无线设备（从型号/厂商推断）
-  if (t === 'tplink' && /eap|ap/i.test(nd.model||'')) return DEVICE_ICONS.wireless;
-  // 核心交换机
-  if (r === 'core') return DEVICE_ICONS.switch_core;
-  // 路由器（从型号推断）
-  if (/router|rt-|ar\d|ne\d|crs|mx\d/i.test(nd.model||'')) return DEVICE_ICONS.router;
-  // 防火墙
-  if (/firewall|fw-|usg|ngfw|secospace|hillstone/i.test(nd.model||'')) return DEVICE_ICONS.firewall;
-  // 默认交换机
-  return DEVICE_ICONS.switch;
-}
-
-// 根据设备角色计算节点尺寸
-function getNodeSize(nd) {
-  if (nd.role === 'core') return { w: 150, h: 72, iconSize: 26, fontSize: 12 };
-  return { w: 110, h: 56, iconSize: 20, fontSize: 10 };
-}
+var NW = 104, NH = 58;
 
 var LKCOLOR = {
   '10G Ethernet':'#3fb950','1G Ethernet':'#388bfd',
@@ -581,7 +802,7 @@ function loadTopoData(d) {
   // 将 allDevices 转换为前端 devices 格式
   var allDev = d.allDevices || d.nodes || [];
   devices = allDev.map(function(x){
-    var v = x.vendor || 'unknown';
+    var v = x.device_type || x.vendor || 'unknown';
     var vCap = v.charAt(0).toUpperCase() + v.slice(1);
     return {
       ip: x.ip,
@@ -593,7 +814,8 @@ function loadTopoData(d) {
       status: x.error ? 'warning' : 'online',
       error: x.error || null,
       sshWarn: x.sshWarn || null,
-      role: (x.neighborCount && x.neighborCount >= 3) ? 'core' : 'access',
+      role: x.role || ((x.neighborCount && x.neighborCount >= 3) ? 'core' : 'access'),
+      layer: x.layer || 0,
       neighbors: (x.neighbors || []).map(function(nb){
         return {
           local_port: portNum(nb.local_port) || nb.local_port || '',
@@ -611,7 +833,7 @@ function loadTopoData(d) {
   var backLinks = d.links || [];
   topo = {
     nodes: backNodes.map(function(n){
-      var v = n.vendor || 'unknown';
+      var v = n.device_type || n.vendor || 'unknown';
       return {
         id: n.label || n.id,
         ip: n.ip,
@@ -620,12 +842,12 @@ function loadTopoData(d) {
         model: n.model || 'Unknown',
         version: n.version || '',
         device_type: v,
-        role: (n.neighborCount && n.neighborCount >= 3) ? 'core' : 'access',
+        role: n.role || ((n.neighborCount && n.neighborCount >= 3) ? 'core' : 'access'),
+        layer: n.layer || 0,
         status: n.error ? 'warning' : 'online'
       };
     }),
     links: backLinks.map(function(l){
-      // source/target 转换为 hostname label
       var sNode = backNodes.find(function(n){ return n.id === l.source || n.ip === l.source; });
       var tNode = backNodes.find(function(n){ return n.id === l.target || n.ip === l.target; });
       return {
@@ -634,12 +856,31 @@ function loadTopoData(d) {
         source_port: portNum(l.source_port) || '',
         target_port: portNum(l.target_port) || '',
         link_type: l.link_type || '以太网',
-        speed: l.speed || l.local_speed || '未知'
+        speed: l.speed || l.local_speed || '未知',
+        manual: l.manual || false
       };
     })
   };
+  // 保留重新扫描前已有的手动链路（manual:true 不被覆盖）
+  var prevManualLinks = topo.links ? topo.links.filter(function(l){ return l.manual === true; }) : [];
   nodePos = {};
   _render();
+  // 将手动链路 merge 回来（不重复）
+  if(prevManualLinks.length > 0){
+    prevManualLinks.forEach(function(ml){
+      var key = [ml.source, ml.target].sort().join('||');
+      var exists = topo.links.some(function(l){
+        return [l.source, l.target].sort().join('||') === key;
+      });
+      if(!exists) topo.links.push(ml);
+    });
+    renderTopo();
+    renderLinkTable();
+  }
+  // 加载拓扑后自动启动一次状态检测（延迟 3 秒）
+  if (apiOk && topo.nodes.length > 0) {
+    setTimeout(function(){ doStatusCheck(); }, 3000);
+  }
 }
 
 function _render() {
@@ -684,6 +925,14 @@ function updateStats(){
   document.getElementById('stOnline').textContent=dvs.filter(function(d){return d&&d.status==='online';}).length;
   document.getElementById('stLinks').textContent=(topo&&topo.links)?topo.links.length:0;
   var v={}; dvs.forEach(function(d){if(d&&d.vendor)v[d.vendor]=1;}); document.getElementById('stVendor').textContent=Object.keys(v).length;
+  // 更新监测面板
+  var onCnt = dvs.filter(function(d){return d&&d.status==='online';}).length;
+  var offCnt = dvs.filter(function(d){return d&&d.status==='offline';}).length;
+  document.getElementById('monTotal').textContent = cnt || '-';
+  document.getElementById('monOnline').textContent = onCnt;
+  document.getElementById('monOffline').textContent = offCnt;
+  var dlk = (topo.links||[]).filter(function(l){return l.liveStatus==='down';}).length;
+  document.getElementById('monLinks').textContent = dlk;
 }
 
 // ═══ 侧边栏设备列表 ═══
@@ -726,15 +975,21 @@ function renderDevTable(){
 // ═══ 链路表格 ═══
 function renderLinkTable(){
   var tb=document.getElementById('lkTblBody');
-  if(!topo.links.length){ tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr>'; return; }
+  if(!topo.links.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:36px;color:#8b949e">暂无数据</td></tr>'; return; }
   tb.innerHTML=topo.links.map(function(l){
     var c=LKCOLOR[l.link_type]||'#388bfd';
-    return '<tr><td><strong>'+l.source+'</strong></td>'
+    var isDown=l.liveStatus==='down';
+    var isManual=l.manual===true;
+    var statusTag=isDown?'<span class="tag tg-r">不通</span>':'<span class="tag tg-g">正常</span>';
+    var manualTag=isManual?'<span class="lk-manual-badge">手动</span>':'';
+    return '<tr'+(isDown?' style="opacity:.6"':'')+'><td><strong>'+l.source+'</strong></td>'
       +'<td><span class="chip">'+(l.source_port||'-')+'</span></td>'
       +'<td><strong>'+l.target+'</strong></td>'
       +'<td><span class="chip">'+(l.target_port||'-')+'</span></td>'
-      +'<td style="color:'+c+'">'+(l.link_type||'-')+'</td>'
-      +'<td><span class="tag tg-b">'+(l.speed||'-')+'</span></td></tr>';
+      +'<td style="color:'+(isDown?'#f85149':c)+'">'+(l.link_type||'-')+'</td>'
+      +'<td><span class="tag tg-b">'+(l.speed||'-')+'</span>'+manualTag+'</td>'
+      +'<td>'+statusTag+'</td>'
+      +'<td>'+(isManual?'<button class="btn-sm-danger" onclick="confirmRemoveLink(\''+l.source.replace(/'/g,'\\\'')+ '\',\''+l.target.replace(/'/g,'\\\'')+'\')" style="padding:2px 8px">删除</button>':'-')+'</td></tr>';
   }).join('');
 }
 
@@ -748,28 +1003,50 @@ function calcPos(nodes, ly) {
     return pos;
   }
   if(ly==='hier'){
-    var cores=nodes.filter(function(n){return n.role==='core';}),
-        acc  =nodes.filter(function(n){return n.role!=='core';});
-    var layers=[cores,acc];
-    layers.forEach(function(layer,li){
-      if(!layer.length)return;
-      var y=120+li*250;
-      layer.forEach(function(n,i){ pos[n.id]={x:W/(layer.length+1)*(i+1),y:y}; });
-    });
+    // 按 layer 值动态分组，最多 4 层
+    var maxLayer = 0;
+    nodes.forEach(function(n){ if((n.layer||0) > maxLayer) maxLayer = n.layer||0; });
+    var layerCount = Math.min(maxLayer + 1, 4);
+    var yStep = Math.min(220, (H - 200) / Math.max(layerCount - 1, 1));
+    for(var li = 0; li < layerCount; li++){
+      var layer = nodes.filter(function(n){ return (n.layer||0) === li; });
+      if(!layer.length) continue;
+      var y = 100 + li * yStep;
+      layer.forEach(function(n, i){
+        pos[n.id] = { x: W/(layer.length+1)*(i+1), y: y };
+      });
+    }
     return pos;
   }
-  // auto
-  var cores=nodes.filter(function(n){return n.role==='core';}),
-      others=nodes.filter(function(n){return n.role!=='core';});
-  cores.forEach(function(n,i){
-    var a=(2*Math.PI*i/Math.max(cores.length,1))-Math.PI/2;
-    var r=cores.length>1?90:0;
-    pos[n.id]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};
-  });
-  others.forEach(function(n,i){
-    var a=(2*Math.PI*i/others.length)-Math.PI/2;
-    var r=Math.min(W,H)*0.33;
-    pos[n.id]={x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};
+  // auto: 按层分组环形排列
+  var rings = [
+    { role: 'core',         r: 0,              label: '核心层' },
+    { role: 'distribution', r: Math.min(W,H)*0.15, label: '汇聚层' },
+    { role: 'access',       r: Math.min(W,H)*0.28, label: '接入层' },
+    { role: 'edge',         r: Math.min(W,H)*0.39, label: '边缘层' }
+  ];
+  // 降级：如果不存在 distribution，就把 access 的半径缩小
+  var hasDist = nodes.some(function(n){ return n.role==='distribution'; });
+  var hasEdge = nodes.some(function(n){ return n.role==='edge'; });
+  if(!hasDist){
+    rings[1].r = 0; // 没有汇聚层，跳过
+    rings[2].r = Math.min(W,H)*0.22;
+    rings[3].r = Math.min(W,H)*0.38;
+  }
+  if(!hasEdge){
+    rings[3].r = rings[2].r + 60; // 没有边缘层
+  }
+  rings.forEach(function(ring){
+    var ringNodes = nodes.filter(function(n){ return n.role===ring.role; });
+    if(!ringNodes.length || ring.r === 0){
+      // r=0 时全部放中心
+      ringNodes.forEach(function(n){ pos[n.id]={x:cx,y:cy}; });
+      return;
+    }
+    ringNodes.forEach(function(n,i){
+      var a=(2*Math.PI*i/ringNodes.length)-Math.PI/2;
+      pos[n.id]={x:cx+ring.r*Math.cos(a), y:cy+ring.r*Math.sin(a)};
+    });
   });
   return pos;
 }
@@ -806,9 +1083,17 @@ function renderTopo(){
     var c=LKCOLOR[lk.link_type]||'#388bfd';
     var hi=lk.speed&&(lk.speed.includes('10G')||lk.speed.includes('25G')||lk.speed.includes('100G'));
     var isLAG=lk.link_type&&lk.link_type.indexOf('LAG')>=0;
+    var isManual = lk.manual === true;
 
-    var line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:c,'stroke-width':hi?3:1.5,'stroke-opacity':'.85'});
-    if(isLAG) line.setAttribute('stroke-dasharray','7,4');
+    // 实时链路状态：不通则红色虚线
+    var isDown = lk.liveStatus === 'down';
+    if (isDown) { c = '#f85149'; }
+
+    var line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:c,'stroke-width':hi?3:1.5,'stroke-opacity':isDown?'.5':'.85'});
+    if(isLAG && !isDown) line.setAttribute('stroke-dasharray','7,4');
+    if(isDown) line.setAttribute('stroke-dasharray','5,5');
+    if(isManual && !isDown) line.setAttribute('stroke-dasharray','3,4');  // 手动链路点线
+    if(isManual && !isDown) line.setAttribute('stroke-opacity','.7');
     gL.appendChild(line);
 
     // 热区
@@ -828,16 +1113,17 @@ function renderTopo(){
   // 节点
   topo.nodes.forEach(function(nd){
     var pos=nodePos[nd.id]; if(!pos) return;
-    var sz = getNodeSize(nd);
-    var w = sz.w, h = sz.h;
+    var isCore=nd.role==='core';
+    var isDist=nd.role==='distribution';
+    var isUpper=isCore||isDist;
+    var isSel=selNode===nd.id;
+    var vc=VCOLOR[nd.device_type]||VCOLOR.generic||'#888';
+    var w=isCore?140:isDist?120:NW, h=isCore?68:isDist?62:NH;
+    var isOffline = nd.status === 'offline';
 
     var g=svgEl('g',{});
     g.setAttribute('transform','translate('+(pos.x-w/2)+','+(pos.y-h/2)+')');
     g.style.cursor='pointer';
-
-    var isCore=nd.role==='core';
-    var isSel=selNode===nd.id;
-    var vc=VCOLOR[nd.device_type]||VCOLOR.generic||'#888';
 
     // 选中发光
     if(isSel){
@@ -845,52 +1131,57 @@ function renderTopo(){
       g.appendChild(gl);
     }
 
-    // 核心设备：圆角方框 + 双层边框
-    if(isCore){
-      var outerBg=svgEl('rect',{width:w,height:h,rx:10,fill:'#0d1117',stroke:vc,'stroke-width':3,opacity:0.5});
-      g.appendChild(outerBg);
-    }
-
     // 背景
-    var bg=svgEl('rect',{width:w,height:h,rx:8,fill:isCore?'#162032':'#21262d',stroke:isSel?'#388bfd':(isCore?vc:'#30363d'),'stroke-width':isCore?2:1});
+    var borderColor = isOffline ? '#f85149' : (isSel ? '#388bfd' : (isUpper ? vc : '#30363d'));
+    var borderW = isOffline ? 2 : (isUpper ? 2 : 1);
+    var bgFill = isOffline ? '#2a1215' : (isUpper ? '#162032' : '#21262d');
+    var bg=svgEl('rect',{width:w,height:h,rx:8,fill:bgFill,stroke:borderColor,'stroke-width':borderW});
+    if(isOffline) bg.setAttribute('opacity','0.7');
     g.appendChild(bg);
 
     // 顶部颜色条
-    var bar=svgEl('rect',{width:w,height:isCore?5:4,rx:8,fill:vc});
+    var bar=svgEl('rect',{width:w,height:isUpper?5:4,rx:8,fill:vc});
     g.appendChild(bar);
 
-    // 设备图标（SVG）
-    var iconG=svgEl('g',{transform:'translate(8,'+(isCore?16:14)+')',width:sz.iconSize,height:sz.iconSize,style:'color:'+vc});
-    iconG.innerHTML = getDeviceIcon(nd);
-    // 缩放图标到目标尺寸
-    var svgUse = iconG.querySelector('svg');
-    g.appendChild(iconG);
+    // 设备图标（简单圆圈）
+    var iconR=isUpper?12:9;
+    var icon=svgEl('circle',{cx:8+iconR,cy:h/2,r:iconR,fill:'none',stroke:vc,'stroke-width':isUpper?2:1.5});
+    g.appendChild(icon);
+    // 圆圈中心小点
+    g.appendChild(svgEl('circle',{cx:8+iconR,cy:h/2,r:3,fill:vc,opacity:'0.6'}));
 
-    // 文字区域（图标右侧）
-    var txtX = 12 + sz.iconSize + 6;
+    // 文字区域
+    var txtX = 8 + iconR*2 + 8;
 
     // 主机名
-    var maxNmLen = Math.floor((w - txtX - 16) / (sz.fontSize * 0.6));
+    var maxNmLen = isUpper ? 18 : 14;
     var nm=nd.hostname||'';
     if(nm.length>maxNmLen) nm=nm.slice(0,maxNmLen-1)+'…';
-    g.appendChild(svgTxt(txtX, isCore?24:20, nm, '#e6edf3', sz.fontSize, true));
+    g.appendChild(svgTxt(txtX, isUpper?26:22, nm, '#e6edf3', isUpper?12:11, true));
 
     // IP
-    g.appendChild(svgTxt(txtX, (isCore?24:20)+14, nd.ip||'', '#6e7681', sz.fontSize-2));
+    g.appendChild(svgTxt(txtX, (isUpper?26:22)+14, nd.ip||'', '#6e7681', isUpper?10:9));
 
-    // 型号
-    if(isCore){
+    // 型号（核心层/汇聚层）
+    if(isUpper){
       var ml=(nd.model||''); if(ml.length>20)ml=ml.slice(0,19)+'…';
-      g.appendChild(svgTxt(txtX, 52, ml, vc, 8));
+      g.appendChild(svgTxt(txtX, isCore?54:50, ml, vc, 8));
     }
 
     // 状态灯
     var sc=nd.status==='online'?'#3fb950':nd.status==='warning'?'#d29922':'#f85149';
-    g.appendChild(svgEl('circle',{cx:w-10,cy:10,r:isCore?5:4,fill:sc}));
+    g.appendChild(svgEl('circle',{cx:w-10,cy:10,r:isUpper?5:4,fill:sc}));
 
     // 事件
     (function(node){
-      g.addEventListener('click',function(){ pickDev(node.id); });
+      g.addEventListener('click',function(){
+        // 如果在拾取模式，则填入对应选择框
+        if(_lkPickMode){
+          var consumed = _onNodePickClick(node.ip);
+          if(consumed) return;
+        }
+        pickDev(node.id);
+      });
       g.addEventListener('mouseover',function(e){ showTipNode(e,node); });
       g.addEventListener('mouseout',hideTip);
       makeDrag(g, node.id);
@@ -916,11 +1207,62 @@ function makeDrag(g, id){
     renderTopo();
   });
   document.addEventListener('mouseup',function(){
-    if(dragging&&dragNd===id){ dragging=false; dragNd=null; }
+    if(dragging&&dragNd===id){ dragging=false; dragNd=null;
+      if(layout==='hier') updateNodeLayerByPosition(id);
+    }
   });
 }
 
-// ═══ 画布平移缩放 ═══
+// ═══ 根据拖拽位置自动更新设备层级 ═══
+function updateNodeLayerByPosition(id){
+  var H = document.getElementById('cvs').clientHeight||600;
+  var pos = nodePos[id];
+  if(!pos) return;
+  var nd = topo.nodes.find(function(n){ return n.id===id; });
+  if(!nd) return;
+  // 计算当前 hier 各层的 y 范围
+  var maxLayer = 0;
+  topo.nodes.forEach(function(n){ if((n.layer||0)>maxLayer) maxLayer = n.layer||0; });
+  var layerCount = Math.min(maxLayer+1, 4);
+  var yStep = Math.min(220, (H-200)/Math.max(layerCount-1,1));
+  // 找最近的层
+  var bestLayer = 0, bestDist = 9999;
+  for(var li=0; li<layerCount; li++){
+    var ly = 100 + li*yStep;
+    var dist = Math.abs(pos.y - ly);
+    if(dist < bestDist){ bestDist=dist; bestLayer=li; }
+  }
+  var layerRoles = ['core','distribution','access','edge'];
+  var newRole = layerRoles[Math.min(bestLayer,3)];
+  if(nd.role !== newRole){
+    nd.role = newRole;
+    nd.layer = bestLayer;
+    // 同步更新 devices 数组
+    devices.forEach(function(d){ if(d.hostname===nd.hostname||d.ip===nd.ip) d.role=newRole; });
+    // 保存到后端
+    fetch(API+'/role-update', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ip:nd.ip, role:newRole})
+    }).catch(function(){});
+    renderTopo();
+  }
+}
+
+// ═══ 手动修改设备层级 ═══
+function changeRole(ip, newRole){
+  var layerMap = {core:0, distribution:1, access:2, edge:3};
+  var newLayer = layerMap[newRole]!==undefined ? layerMap[newRole] : 2;
+  // 更新 devices
+  devices.forEach(function(d){ if(d.ip===ip) d.role=newRole; });
+  // 更新 topo.nodes
+  topo.nodes.forEach(function(n){ if(n.ip===ip){ n.role=newRole; n.layer=newLayer; } });
+  // 保存到后端
+  fetch(API+'/role-update', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ip:ip, role:newRole})
+  }).then(function(){ renderTopo(); });
+}
+
 var svgEl2=document.getElementById('svg');
 svgEl2.addEventListener('mousedown',function(e){
   if(dragNd||e.target.closest('g[transform]'))return;
@@ -985,8 +1327,7 @@ function pickDev(id){
     +'<div class="irow"><span class="ik">IP</span><span class="iv" style="color:#388bfd;font-family:Consolas">'+d.ip+'</span></div>'
     +'<div class="irow"><span class="ik">厂商</span><span class="iv"><span class="tag '+vc+'">'+(d.vendor||'-')+'</span></span></div>'
     +'<div class="irow"><span class="ik">型号</span><span class="iv">'+(d.model||'-')+'</span></div>'
-    +'<div class="irow"><span class="ik">版本</span><span class="iv" style="font-size:11px">'+(d.version||'-')+'</span></div>'
-    +'<div class="irow"><span class="ik">角色</span><span class="iv"><span class="tag tg-b">'+(d.role||'access')+'</span></span></div>'
+    +'<div class="irow"><span class="ik">角色</span><span class="iv" id="roleWrap"></span></div>'
     +(d.error?'<div class="irow"><span class="ik">错误</span><span class="iv" style="color:#d29922;font-size:12px">'+d.error+'</span></div>':'')
     +'</div>'
     +'<div class="det-sec"><div class="det-sec-t">LLDP 邻居 ('+nb.length+')</div>'
@@ -997,27 +1338,457 @@ function pickDev(id){
     +'<div class="irow"><span class="ik">sysName</span><span class="iv" style="font-size:10px;font-family:Consolas">1.3.6.1.2.1.1.5.0</span></div>'
     +'<div class="irow"><span class="ik">sysDescr</span><span class="iv" style="font-size:10px;font-family:Consolas">1.3.6.1.2.1.1.1.0</span></div>'
     +'<div class="irow"><span class="ik">LLDP邻居</span><span class="iv" style="font-size:10px;font-family:Consolas">1.0.8802.1.1.2.*</span></div>'
+    +'</div>'
+    +'<div class="det-sec" style="border-top:1px solid #30363d;padding-top:12px;margin-top:4px">'
+    +'<button class="btn-sm-danger" style="width:100%;padding:7px;font-size:12px" onclick="confirmRemoveDevice(\''+d.ip+'\',\''+d.hostname.replace(/'/g,'\\\'')+'\')">🗑 从拓扑中删除此设备</button>'
     +'</div>';
+
+  // 动态生成角色下拉
+  setTimeout(function(){
+    var wrap = document.getElementById('roleWrap');
+    if(!wrap) return;
+    var ip = d.ip;
+    var sel = document.createElement('select');
+    sel.style.cssText = 'background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:4px;padding:2px 4px;font-size:11px';
+    var roles = ['core','distribution','access','edge'];
+    var labels = ['核心层','汇聚层','接入层','边缘层'];
+    roles.forEach(function(r,i){
+      var opt = document.createElement('option');
+      opt.value = r;
+      opt.textContent = labels[i];
+      if(r === (d.role||'access')) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = function(){ changeRole(ip, this.value); };
+    wrap.innerHTML = '';
+    wrap.appendChild(sel);
+  }, 0);
 }
+
 function closeDetail(){ selNode=null; document.getElementById('detPanel').className='detail hide'; renderSidebar(); renderTopo(); }
+
+// ═══ 添加设备面板 ═══
+function openAddPanel(){
+  document.getElementById('addPanel').classList.add('open');
+  document.getElementById('addOverlay').style.display='block';
+  document.getElementById('addResult').innerHTML='';
+}
+function closeAddPanel(){
+  document.getElementById('addPanel').classList.remove('open');
+  document.getElementById('addOverlay').style.display='none';
+}
+
+function doAddDevices(){
+  var raw = (document.getElementById('addIpInput').value||'').trim();
+  if(!raw){ alert('请输入至少一个 IP 地址'); return; }
+  var ips = raw.split(/[\n,;\s]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 0; });
+  if(!ips.length){ alert('未解析到有效 IP'); return; }
+
+  var community = (document.getElementById('addCommunity').value||'').trim();
+  var payload = { ips: ips };
+  if(community) payload.community = community;
+
+  document.getElementById('addBtn').disabled = true;
+  document.getElementById('addSpin').style.display = 'inline-block';
+  document.getElementById('addTxt').textContent = '探测中...';
+  document.getElementById('addResult').innerHTML = '<div style="color:#8b949e;font-size:12px;padding:8px 0">正在通过 SNMP 探测 ' + ips.length + ' 台设备，请稍候...</div>';
+
+  fetch(API + '/device/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data.error){ throw new Error(data.error); }
+
+    // 更新前端拓扑数据
+    if(data.topology){
+      _mergeTopology(data.topology);
+    }
+
+    // 渲染结果
+    var html = '';
+    var added = 0, failed = 0;
+    (data.results||[]).forEach(function(r){
+      if(r.ok){
+        added++;
+        html += '<div class="add-result-item ok">'
+          +'<div class="res-ip">✅ ' + r.ip + '</div>'
+          +'<div class="res-detail">'
+          + (r.node.label !== r.ip ? r.node.label + ' | ' : '')
+          + (r.node.vendor !== 'unknown' ? r.node.vendor + ' ' : '')
+          + (r.node.model !== 'Unknown' ? r.node.model : '')
+          + (r.linksAdded > 0 ? ' | 发现 ' + r.linksAdded + ' 条链路' : ' | 未发现链路')
+          +'</div></div>';
+      } else {
+        failed++;
+        html += '<div class="add-result-item err">'
+          +'<div class="res-ip">❌ ' + r.ip + '</div>'
+          +'<div class="res-detail">' + (r.error||'失败') + '</div>'
+          +'</div>';
+      }
+    });
+    if(added > 0){
+      html = '<div style="font-size:12px;color:#3fb950;margin-bottom:8px;font-weight:600">成功添加 ' + added + ' 台设备' + (failed>0?' | 失败 '+failed+' 台':'') + '</div>' + html;
+      log('手动添加设备：成功 ' + added + ' 台' + (failed>0?'，失败 '+failed+' 台':''), 'ok');
+    } else {
+      html = '<div style="font-size:12px;color:#d29922;margin-bottom:8px;font-weight:600">所有设备添加失败</div>' + html;
+      log('手动添加设备：全部失败','err');
+    }
+    document.getElementById('addResult').innerHTML = html;
+  }).catch(function(e){
+    document.getElementById('addResult').innerHTML = '<div style="color:#f85149;font-size:12px">请求失败: ' + e.message + '</div>';
+  }).finally(function(){
+    document.getElementById('addBtn').disabled = false;
+    document.getElementById('addSpin').style.display = 'none';
+    document.getElementById('addTxt').textContent = '开始探测并添加';
+  });
+}
+
+// 将后端返回的拓扑 merge 进前端（保留现有节点的 nodePos 坐标）
+function _mergeTopology(backTopo){
+  if(!backTopo || !backTopo.nodes) return;
+  var existIds = {};
+  topo.nodes.forEach(function(n){ existIds[n.ip] = true; });
+
+  // 添加新节点到 topo 和 devices
+  backTopo.nodes.forEach(function(n){
+    if(existIds[n.ip]) return; // 已存在的不动
+    var v = n.device_type || n.vendor || 'unknown';
+    var nd = {
+      id: n.label || n.id || n.ip,
+      ip: n.ip,
+      hostname: n.label || n.hostname || n.ip,
+      vendor: v.charAt(0).toUpperCase() + v.slice(1),
+      device_type: v,
+      model: n.model || 'Unknown',
+      version: n.version || '',
+      role: n.role || 'access',
+      layer: n.layer || 2,
+      status: 'online',
+      manualAdded: true
+    };
+    topo.nodes.push(nd);
+    // 同步到 devices
+    devices.push({
+      ip: nd.ip,
+      hostname: nd.hostname,
+      vendor: nd.vendor,
+      model: nd.model,
+      version: nd.version,
+      device_type: nd.device_type,
+      status: 'online',
+      role: nd.role,
+      layer: nd.layer,
+      neighbors: [],
+      manualAdded: true
+    });
+  });
+
+  // 添加新链路（需要把 IP 转换为 label，保持前端格式一致）
+  var ipToId = {};
+  topo.nodes.forEach(function(n){ ipToId[n.ip] = n.id || n.hostname; });
+
+  backTopo.links.forEach(function(bl){
+    // 检查前端是否已有该链路（用排序 IP 对 key）
+    var srcIp = bl.source, tgtIp = bl.target;
+    var key = [srcIp, tgtIp].sort().join('||');
+    var exists = topo.links.some(function(fl){
+      var srcNode = topo.nodes.find(function(n){ return n.hostname === fl.source || n.ip === fl.source; });
+      var tgtNode = topo.nodes.find(function(n){ return n.hostname === fl.target || n.ip === fl.target; });
+      var fSrcIp = srcNode ? srcNode.ip : fl.source;
+      var fTgtIp = tgtNode ? tgtNode.ip : fl.target;
+      return [fSrcIp, fTgtIp].sort().join('||') === key;
+    });
+    if(!exists){
+      var srcId = ipToId[srcIp] || srcIp;
+      var tgtId = ipToId[tgtIp] || tgtIp;
+      topo.links.push({
+        source: srcId,
+        target: tgtId,
+        source_port: bl.source_port || '',
+        target_port: bl.target_port || '',
+        link_type: bl.link_type || '以太网',
+        speed: bl.speed || '未知',
+        manual: bl.manual || false
+      });
+    }
+  });
+
+  renderSidebar(); renderDevTable(); renderLinkTable(); updateStats(); renderTopo();
+  document.getElementById('emptyTip').style.display = 'none';
+}
+
+// ═══ 链路编辑面板 ═══
+var _lkPickMode = null; // null | 'src' | 'tgt'
+
+function openLinkPanel(){
+  // 填充下拉
+  _lkPopulateSelects();
+  renderLinkPanelList();
+  document.getElementById('linkPanel').classList.add('open');
+  document.getElementById('linkOverlay').style.display = 'block';
+  document.getElementById('lkAddResult').innerHTML = '';
+}
+
+function closeLinkPanel(){
+  document.getElementById('linkPanel').classList.remove('open');
+  document.getElementById('linkOverlay').style.display = 'none';
+  cancelPickNode();
+}
+
+function _lkPopulateSelects(){
+  var opts = '<option value="">-- 点击拓扑节点或在此选择 --</option>';
+  var sorted = devices.slice().sort(function(a,b){ return a.hostname < b.hostname ? -1 : 1; });
+  sorted.forEach(function(d){
+    opts += '<option value="' + d.ip + '">' + d.hostname + '  (' + d.ip + ')</option>';
+  });
+  document.getElementById('lkSrcSel').innerHTML = opts;
+  document.getElementById('lkTgtSel').innerHTML = opts;
+}
+
+// 进入拾取节点模式
+function startPickNode(which){
+  _lkPickMode = which;
+  var banner = document.getElementById('pickBanner');
+  document.getElementById('pickWhich').textContent = which === 'src' ? '正在选择上联设备' : '正在选择下联设备';
+  banner.style.display = 'block';
+  // 高亮按钮
+  document.getElementById('lkSrcPickBtn').style.background = which === 'src' ? 'rgba(63,185,80,.2)' : '';
+  document.getElementById('lkTgtPickBtn').style.background = which === 'tgt' ? 'rgba(56,139,253,.2)' : '';
+  document.getElementById('svg').style.cursor = 'crosshair';
+}
+
+function cancelPickNode(){
+  _lkPickMode = null;
+  document.getElementById('pickBanner').style.display = 'none';
+  document.getElementById('lkSrcPickBtn').style.background = '';
+  document.getElementById('lkTgtPickBtn').style.background = '';
+  document.getElementById('svg').style.cursor = '';
+}
+
+// 节点点击时，如果在拾取模式，则填入对应选择框
+function _onNodePickClick(ip){
+  if(!_lkPickMode) return false;
+  if(_lkPickMode === 'src'){
+    document.getElementById('lkSrcSel').value = ip;
+    document.getElementById('lkSrcPickBtn').style.background = '';
+    // 自动切换到目标选择
+    startPickNode('tgt');
+  } else {
+    document.getElementById('lkTgtSel').value = ip;
+    cancelPickNode();
+  }
+  return true; // 已消费
+}
+
+// 添加链路
+function doAddLink(){
+  var srcIp = document.getElementById('lkSrcSel').value;
+  var tgtIp = document.getElementById('lkTgtSel').value;
+  if(!srcIp){ showLkResult('请选择上联设备', false); return; }
+  if(!tgtIp){ showLkResult('请选择下联设备', false); return; }
+  if(srcIp === tgtIp){ showLkResult('上联和下联不能是同一台设备', false); return; }
+
+  var payload = {
+    source: srcIp,
+    target: tgtIp,
+    source_port: document.getElementById('lkSrcPort').value.trim(),
+    target_port: document.getElementById('lkTgtPort').value.trim(),
+    link_type: document.getElementById('lkTypeSel').value,
+    speed: document.getElementById('lkSpeedSel').value
+  };
+
+  document.getElementById('lkAddBtn').disabled = true;
+  document.getElementById('lkAddSpin').style.display = 'inline-block';
+  document.getElementById('lkAddTxt').textContent = '保存中...';
+
+  fetch(API + '/link/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data.error){ showLkResult(data.error, false); return; }
+    // 合并到前端
+    _mergeSingleLink(data.link, data.srcLabel, data.tgtLabel);
+    showLkResult('✅ 链路已添加：' + data.srcLabel + ' ↔ ' + data.tgtLabel, true);
+    log('手动添加链路: ' + data.srcLabel + ' (' + (payload.source_port||'?') + ') <-> ' + data.tgtLabel + ' (' + (payload.target_port||'?') + ')', 'ok');
+    showToast('✏️ 链路已添加', 'up');
+    // 清空端口输入框，保留设备选择
+    document.getElementById('lkSrcPort').value = '';
+    document.getElementById('lkTgtPort').value = '';
+    renderLinkPanelList();
+    renderLinkTable();
+  }).catch(function(e){
+    showLkResult('请求失败: ' + e.message, false);
+  }).finally(function(){
+    document.getElementById('lkAddBtn').disabled = false;
+    document.getElementById('lkAddSpin').style.display = 'none';
+    document.getElementById('lkAddTxt').textContent = '确认添加链路';
+  });
+}
+
+function showLkResult(msg, ok){
+  var el = document.getElementById('lkAddResult');
+  el.innerHTML = '<div style="padding:8px 10px;border-radius:6px;font-size:12px;'
+    + (ok ? 'background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:#3fb950'
+           : 'background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);color:#f85149')
+    + '">' + msg + '</div>';
+}
+
+// 将单条链路 merge 进前端
+function _mergeSingleLink(bl, srcLabel, tgtLabel){
+  // 先找两端节点（通过 IP 或 label）
+  var srcNode = topo.nodes.find(function(n){ return n.ip === bl.source || n.id === bl.source; });
+  var tgtNode = topo.nodes.find(function(n){ return n.ip === bl.target || n.id === bl.target; });
+  var srcId = srcNode ? (srcNode.id || srcNode.hostname || srcNode.ip) : (srcLabel || bl.source);
+  var tgtId = tgtNode ? (tgtNode.id || tgtNode.hostname || tgtNode.ip) : (tgtLabel || bl.target);
+
+  // 检查是否已存在（前端防重）
+  var key = [bl.source, bl.target].sort().join('||');
+  var exists = topo.links.some(function(l){
+    var ln = topo.nodes.find(function(n){ return n.id===l.source||n.ip===l.source; });
+    var lt = topo.nodes.find(function(n){ return n.id===l.target||n.ip===l.target; });
+    var fSrc = ln ? ln.ip : l.source;
+    var fTgt = lt ? lt.ip : l.target;
+    return [fSrc, fTgt].sort().join('||') === key;
+  });
+  if(!exists){
+    topo.links.push({
+      source: srcId,
+      target: tgtId,
+      source_port: bl.source_port || '',
+      target_port: bl.target_port || '',
+      link_type: bl.link_type || '1G Ethernet',
+      speed: bl.speed || '1Gbps',
+      manual: true
+    });
+  }
+  renderTopo();
+  updateStats();
+}
+
+// 链路面板列表渲染
+function renderLinkPanelList(){
+  var manualOnly = document.getElementById('lkShowManualOnly').checked;
+  var links = topo.links.filter(function(l){ return manualOnly ? l.manual === true : true; });
+  document.getElementById('lkListCnt').textContent = links.length;
+  if(!links.length){
+    document.getElementById('lkPanelList').innerHTML = '<div style="color:#8b949e;font-size:12px;padding:12px 0">暂无链路</div>';
+    return;
+  }
+  var html = '';
+  links.forEach(function(l, idx){
+    var c = LKCOLOR[l.link_type] || '#388bfd';
+    var manualBadge = l.manual ? '<span class="lk-manual-badge">手动</span>' : '';
+    html += '<div class="lk-list-item">'
+      + '<div style="width:8px;height:8px;border-radius:50%;background:' + c + ';flex-shrink:0;margin-top:2px"></div>'
+      + '<div class="lk-info">'
+      + '<div class="lk-devices">' + l.source + ' ↔ ' + l.target + manualBadge + '</div>'
+      + '<div class="lk-ports">' + (l.source_port ? l.source_port : '?') + '  /  ' + (l.target_port ? l.target_port : '?') + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;flex-shrink:0">'
+      + '<div class="lk-type" style="color:' + c + ';margin-bottom:4px">' + (l.link_type||'-') + '</div>'
+      + (l.manual ? '<button class="btn-sm-danger" style="padding:2px 6px;font-size:10px" onclick="confirmRemoveLink(\''
+          + l.source.replace(/'/g,"\\'") + '\',\'' + l.target.replace(/'/g,"\\'") + '\')">删除</button>' : '')
+      + '</div>'
+      + '</div>';
+  });
+  document.getElementById('lkPanelList').innerHTML = html;
+}
+
+// 确认删除链路
+function confirmRemoveLink(src, tgt){
+  if(!confirm('确认删除链路：\n\n' + src + ' ↔ ' + tgt + '\n\n此操作会保存到缓存。')) return;
+  doRemoveLink(src, tgt);
+}
+
+function doRemoveLink(src, tgt){
+  fetch(API + '/link/remove', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: src, target: tgt })
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data.error){ log('删除链路失败: ' + data.error, 'err'); return; }
+    // 从前端移除（用排序 IP 对 key 或 hostname 对 key）
+    var key = [src, tgt].sort().join('||');
+    topo.links = topo.links.filter(function(l){
+      var lKey = [l.source, l.target].sort().join('||');
+      return lKey !== key;
+    });
+    renderTopo();
+    renderLinkTable();
+    renderLinkPanelList();
+    updateStats();
+    log('已删除链路: ' + src + ' <-> ' + tgt, 'ok');
+    showToast('🗑 链路已删除', 'up');
+  }).catch(function(e){
+    log('删除链路请求失败: ' + e.message, 'err');
+  });
+}
+
+// ═══ 删除设备 ═══
+function confirmRemoveDevice(ip, name){
+  if(!confirm('确认从拓扑中删除设备：\n\n' + name + ' (' + ip + ')\n\n此操作同时删除该设备的所有链路，已自动保存。')) return;
+  doRemoveDevice(ip);
+}
+
+function doRemoveDevice(ip){
+  fetch(API + '/device/remove', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ip: ip })
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data.error){ log('删除失败: ' + data.error, 'err'); return; }
+    // 从前端移除节点
+    var nodeId = null;
+    topo.nodes = topo.nodes.filter(function(n){
+      if(n.ip === ip){ nodeId = n.id || n.hostname; return false; }
+      return true;
+    });
+    devices = devices.filter(function(d){ return d.ip !== ip; });
+    // 移除相关链路
+    if(nodeId){
+      topo.links = topo.links.filter(function(l){
+        return l.source !== nodeId && l.source !== ip
+            && l.target !== nodeId && l.target !== ip;
+      });
+    }
+    // 清理 nodePos
+    if(nodeId && nodePos[nodeId]) delete nodePos[nodeId];
+    closeDetail();
+    renderSidebar(); renderDevTable(); renderLinkTable(); updateStats(); renderTopo();
+    log('已删除设备 ' + (data.removed.label||ip) + ' (' + ip + ')，清理链路 ' + (data.linksRemoved||0) + ' 条', 'ok');
+    showToast('🗑 已删除 ' + (data.removed.label||ip), 'up');
+  }).catch(function(e){
+    log('删除请求失败: ' + e.message, 'err');
+  });
+}
 
 // ═══ Tooltip ═══
 function showTipNode(e,nd){
+  var stl = nd.status==='online'?'在线':nd.status==='warning'?'告警':'离线';
+  var stc = nd.status==='online'?'#3fb950':nd.status==='warning'?'#d29922':'#f85149';
   var tt=document.getElementById('tip');
   tt.innerHTML='<h4>'+nd.hostname+'</h4>'
     +'<div class="ts">'+nd.ip+'</div>'
+    +'<div class="ts">状态: <strong style="color:'+stc+'">'+stl+'</strong></div>'
     +'<div class="ts">厂商: <strong>'+(nd.vendor||'-')+'</strong></div>'
     +'<div class="ts">型号: '+(nd.model||'-')+'</div>'
-    +'<div class="ts">版本: '+(nd.version||'-')+'</div>';
+;
   moveTip(e);
 }
 function showTipLink(e,lk,c){
+  var isDown = lk.liveStatus === 'down';
+  var isManual = lk.manual === true;
+  var statusHtml = isDown ? '<div class="ts" style="color:#f85149;font-weight:bold">⚠ 链路不通</div>' : '';
+  var manualHtml = isManual ? '<div class="ts" style="color:#bc8cff">✏️ 手动添加链路</div>' : '';
   var tt=document.getElementById('tip');
-  tt.innerHTML='<h4 style="color:'+c+'">🔗 '+(lk.link_type||'-')+'</h4>'
+  tt.innerHTML='<h4 style="color:'+(isDown?'#f85149':c)+'">🔗 '+(lk.link_type||'-')+'</h4>'
     +'<div class="ts"><span class="chip">'+lk.source+'</span> : <span class="chip">'+(lk.source_port||'-')+'</span></div>'
     +'<div class="ts" style="text-align:center">↕</div>'
     +'<div class="ts"><span class="chip">'+lk.target+'</span> : <span class="chip">'+(lk.target_port||'-')+'</span></div>'
-    +'<div class="ts" style="margin-top:4px">速率: <strong style="color:#3fb950">'+(lk.speed||'-')+'</strong></div>';
+    +'<div class="ts" style="margin-top:4px">速率: <strong style="color:#3fb950">'+(lk.speed||'-')+'</strong></div>'
+    + statusHtml + manualHtml;
   moveTip(e);
 }
 function moveTip(e){
@@ -1027,6 +1798,165 @@ function moveTip(e){
   tt.style.left=x+'px'; tt.style.top=y+'px'; tt.style.display='block';
 }
 function hideTip(){ document.getElementById('tip').style.display='none'; }
+
+// ═══ 状态监测 ═══
+var _monTimer = null;
+var _monInterval = 120000; // 默认 2 分钟
+var _monRunning = false;
+var liveDeviceStatus = {}; // ip -> 'online'/'offline' 缓存
+
+// 设置轮询间隔
+function setMonitorInterval(sec) {
+  _monInterval = parseInt(sec) * 1000;
+  if (_monTimer) { clearTimeout(_monTimer); _monTimer = null; }
+  if (_monInterval > 0) {
+    _monTimer = setTimeout(function(){ doStatusCheck(); }, _monInterval);
+    log('状态监测轮询已启动，间隔 ' + sec + ' 秒', 'ok');
+  } else {
+    log('状态监测轮询已关闭', 'info');
+    document.getElementById('monNextTime').textContent = '';
+  }
+}
+
+// 执行一次状态检测
+function doStatusCheck() {
+  if (!apiOk) { log('后端未连接，无法执行状态检测', 'warn'); return; }
+  if (_monRunning) { log('状态检测进行中，请稍候', 'warn'); return; }
+  if (!topo.nodes || topo.nodes.length === 0) { log('暂无拓扑数据，请先扫描', 'warn'); return; }
+
+  _monRunning = true;
+  document.getElementById('monSpin').style.display = 'inline-block';
+  document.getElementById('monBtnTxt').textContent = '检测中...';
+
+  var url = API + '/status-check';
+
+  fetch(url).then(function(r){ return r.json(); }).then(function(data){
+    if (data.error) { log('状态检测: ' + data.error, 'warn'); return; }
+
+    // 更新设备状态
+    liveDeviceStatus = data.devices || {};
+
+    // 更新前端 devices 和 topo 节点状态
+    devices.forEach(function(d){
+      if (liveDeviceStatus[d.ip] === 'offline') {
+        d.status = 'offline';
+      } else if (liveDeviceStatus[d.ip] === 'online') {
+        d.status = 'online';
+      }
+    });
+    topo.nodes.forEach(function(n){
+      if (liveDeviceStatus[n.ip] === 'offline') {
+        n.status = 'offline';
+      } else if (liveDeviceStatus[n.ip] === 'online') {
+        n.status = 'online';
+      }
+    });
+
+    // 更新链接状态
+    var linkData = data.links || {};
+    topo.links.forEach(function(lk, i){
+      lk.liveStatus = linkData[i] || 'up';
+    });
+
+    // 重新渲染所有 UI
+    renderSidebar();
+    renderDevTable();
+    renderLinkTable();
+    renderTopo();
+    updateStats();
+
+    // 更新监测面板
+    updateMonitorPanel(data);
+
+    // 处理变化通知
+    if (data.changes && data.changes.length > 0) {
+      data.changes.forEach(function(ch){
+        if (ch.event === 'down') {
+          showToast(ch.hostname + ' (' + ch.ip + ') 已离线', 'down');
+          log('设备离线: ' + ch.hostname + ' (' + ch.ip + ')', 'err');
+        } else {
+          showToast(ch.hostname + ' (' + ch.ip + ') 已恢复在线', 'up');
+          log('设备恢复: ' + ch.hostname + ' (' + ch.ip + ')', 'ok');
+        }
+      });
+    }
+
+    log('状态检测完成：在线 ' + (data.summary?data.summary.online:'?') + '，离线 ' + (data.summary?data.summary.offline:'?'), 'ok');
+  }).catch(function(e){
+    log('状态检测失败: ' + (e && e.message ? e.message : e), 'err');
+  }).finally(function(){
+    _monRunning = false;
+    document.getElementById('monSpin').style.display = 'none';
+    document.getElementById('monBtnTxt').textContent = '立即检测';
+    // 下一轮定时
+    if (_monInterval > 0) {
+      _monTimer = setTimeout(function(){ doStatusCheck(); }, _monInterval);
+      var next = new Date(Date.now() + _monInterval);
+      var ts = ('0'+next.getHours()).slice(-2)+':'+('0'+next.getMinutes()).slice(-2)+':'+('0'+next.getSeconds()).slice(-2);
+      document.getElementById('monNextTime').textContent = '下次检测: ' + ts;
+    }
+  });
+}
+
+// 更新监测面板统计
+function updateMonitorPanel(data) {
+  var s = data.summary || {};
+  document.getElementById('monTotal').textContent = s.total || '-';
+  document.getElementById('monOnline').textContent = s.online !== undefined ? s.online : '-';
+  document.getElementById('monOffline').textContent = s.offline !== undefined ? s.offline : '-';
+  var downLinks = 0;
+  var ld = data.links || {};
+  for (var k in ld) { if (ld[k] === 'down') downLinks++; }
+  document.getElementById('monLinks').textContent = downLinks || '0';
+  var t = data.checkedAt ? new Date(data.checkedAt).toLocaleString() : '';
+  document.getElementById('monLastCheck').textContent = '上次检测: ' + t;
+}
+
+// 加载状态历史
+function loadStatusHistory() {
+  if (!apiOk) return;
+  fetch(API + '/status-history?limit=100').then(function(r){ return r.json(); }).then(function(data){
+    renderTimeline(data.records || []);
+  }).catch(function(){});
+}
+
+// 渲染时间线
+function renderTimeline(records) {
+  var el = document.getElementById('monTimeline');
+  if (!records || records.length === 0) {
+    el.innerHTML = '<div class="timeline-empty">暂无上下线历史记录<br><span style="font-size:11px;opacity:.7">开启轮询后自动记录</span></div>';
+    return;
+  }
+  var html = '';
+  records.forEach(function(r){
+    var t = r.time ? new Date(r.time).toLocaleString() : '';
+    var evtText = r.event === 'down'
+      ? '<span style="color:#f85149">设备离线</span> (之前: ' + (r.prevStatus==='online'?'在线':'未知') + ')'
+      : '<span style="color:#3fb950">设备恢复</span> (之前: ' + (r.prevStatus==='offline'?'离线':'未知') + ')';
+    html += '<div class="tl-item">'
+      + '<div class="tl-icon ' + r.event + '"></div>'
+      + '<div class="tl-body">'
+      + '<div class="tl-host">' + (r.hostname||r.ip) + '</div>'
+      + '<div class="tl-ip">' + r.ip + '</div>'
+      + '<div class="tl-event">' + evtText + '</div>'
+      + '</div>'
+      + '<div class="tl-time">' + t + '</div>'
+      + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// Toast 通知
+function showToast(msg, type) {
+  var wrap = document.getElementById('toastWrap');
+  var div = document.createElement('div');
+  div.className = 'toast toast-' + (type || 'up');
+  div.textContent = (type === 'down' ? '🔴 ' : '🟢 ') + msg;
+  wrap.appendChild(div);
+  setTimeout(function(){
+    if (div.parentNode) div.parentNode.removeChild(div);
+  }, 8000);
+}
 
 // ═══ 导出 ═══
 function exportSVG(){
@@ -1046,9 +1976,13 @@ function gotoPage(name, btn){
   document.getElementById('page-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   else {
-    var map={topo:0,devices:1,links:2};
+    var map={topo:0,devices:1,links:2,monitor:3};
     var tabs=document.querySelectorAll('.nav-tab');
     if(tabs[map[name]]) tabs[map[name]].classList.add('active');
+  }
+  // 切换到监测页时加载历史
+  if (name === 'monitor') {
+    loadStatusHistory();
   }
 }
 
