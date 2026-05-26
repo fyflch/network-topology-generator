@@ -453,9 +453,7 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
           <button class="btn-sm" onclick="fitView()">⛶ 适应</button>
         </div>
         <div class="t-group">
-          <button class="btn-sm on" id="lyAuto" onclick="setLayout('auto',this)">⊛ 自动</button>
-          <button class="btn-sm" id="lyHier" onclick="setLayout('hier',this)">↕ 层次</button>
-          <button class="btn-sm" id="lyCircle" onclick="setLayout('circle',this)">◎ 环形</button>
+          <button class="btn-sm on" id="lyHier" onclick="setLayout('hier',this)">↕ 层次</button>
         </div>
         <div class="t-group">
           <button class="btn-sm" id="lblBtn" onclick="toggleLabel()">🏷 标签</button>
@@ -469,7 +467,7 @@ html, body { width: 100%; height: 100%; background: #0d1117; color: #e6edf3; fon
           <span><span class="leg-line" style="background:#3fb950;height:3px"></span>10G</span>
           <span><span class="leg-line" style="background:#388bfd"></span>1G</span>
           <span><span class="leg-line" style="background:#bc8cff;border-top:2px dashed #bc8cff;height:0"></span>LAG</span>
-          <span><span class="leg-line" style="background:#bc8cff;border-top:2px dashed #bc8cff;height:0;border-style:dotted"></span>手动</span>
+          <span><span class="leg-line" style="background:#8b949e;border-top:1px dashed #8b949e;height:0"></span>手动</span>
         </div>
       </div>
       <div class="canvas" id="cvs">
@@ -621,7 +619,7 @@ window.addEventListener('unhandledrejection', function(e) {
 // ═══ 状态 ═══
 var API = location.protocol + '//' + location.host + '/api';
 var devices = [], topo = {nodes:[],links:[]};
-var selNode = null, showLbl = true, layout = 'auto';
+var selNode = null, showLbl = true, layout = 'hier';
 var apiOk = false;
 var scale = 1, tx = 0, ty = 0;
 var nodePos = {};
@@ -873,6 +871,8 @@ function loadTopoData(d) {
     if(typeof savedLayout.tx === 'number') tx = savedLayout.tx;
     if(typeof savedLayout.ty === 'number') ty = savedLayout.ty;
     if(savedLayout.layout){ layout = savedLayout.layout; _switchLayoutUI(layout); }
+    // 兼容旧布局：auto/circle 回退为 hier
+    if(layout !== 'hier'){ layout = 'hier'; _switchLayoutUI(layout); }
     log('已恢复布局缓存：' + Object.keys(nodePos).length + ' 个节点坐标', 'ok');
   } else {
     nodePos = {};
@@ -1121,11 +1121,15 @@ function renderTopo(){
     var isDown = lk.liveStatus === 'down';
     if (isDown) { c = '#f85149'; }
 
-    var line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:c,'stroke-width':hi?3:1.5,'stroke-opacity':isDown?'.5':'.85'});
-    if(isLAG && !isDown) line.setAttribute('stroke-dasharray','7,4');
-    if(isDown) line.setAttribute('stroke-dasharray','5,5');
-    if(isManual && !isDown) line.setAttribute('stroke-dasharray','3,4');  // 手动链路点线
-    if(isManual && !isDown) line.setAttribute('stroke-opacity','.7');
+    // 手动链路：统一灰色细虚线，不跟随带宽类型
+    var line;
+    if(isManual && !isDown){
+      line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:'#8b949e','stroke-width':1.2,'stroke-opacity':'.75','stroke-dasharray':'6,4'});
+    } else {
+      line=svgEl('line',{x1:sp.x,y1:sp.y,x2:tp.x,y2:tp.y,stroke:c,'stroke-width':hi?3:1.5,'stroke-opacity':isDown?'.5':'.85'});
+      if(isLAG && !isDown) line.setAttribute('stroke-dasharray','7,4');
+      if(isDown) line.setAttribute('stroke-dasharray','5,5');
+    }
     gL.appendChild(line);
 
     // 热区
@@ -1322,7 +1326,8 @@ function fitView(){ scale=.85; tx=0; ty=0; applyTf(); }
 // ═══ 布局切换 ═══
 function setLayout(ly, btn){
   layout=ly; nodePos={};
-  ['lyAuto','lyHier','lyCircle'].forEach(function(id){ document.getElementById(id).className='btn-sm'; });
+  var lyHier = document.getElementById('lyHier');
+  if(lyHier) lyHier.className='btn-sm';
   if(btn) btn.className='btn-sm on';
   renderTopo();
   saveLayoutDebounced();
